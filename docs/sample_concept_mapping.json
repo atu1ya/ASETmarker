@@ -1,0 +1,27 @@
+{
+    "_instructions": "This file maps questions to learning areas. Edit to match your exam.",
+    "_threshold": "Students scoring >=51% in an area are 'Done Well', below 51% is 'Needs Improvement'",
+    "_format": "Each question should appear in exactly ONE area per subject",
+
+    "Reading": {
+        "Main Idea & Theme": ["q1", "q6", "q11", "q16", "q21", "q26"],
+        "Inference & Interpretation": ["q2", "q7", "q12", "q17", "q22", "q27"],
+        "Vocabulary in Context": ["q3", "q8", "q13", "q18", "q23", "q28"],
+        "Author's Purpose & Tone": ["q4", "q9", "q14", "q19", "q24", "q29"],
+        "Text Structure & Features": ["q5", "q10", "q15", "q20", "q25", "q30"]
+    },
+
+    "Quantitative Reasoning": {
+        "Number & Operations": ["qr1", "qr2", "qr3", "qr4", "qr5"],
+        "Algebra & Patterns": ["qr6", "qr7", "qr8", "qr9", "qr10"],
+        "Measurement": ["qr11", "qr12", "qr13", "qr14", "qr15"],
+        "Geometry & Spatial Sense": ["qr16", "qr17", "qr18", "qr19", "qr20"],
+        "Statistics & Probability": ["qr21", "qr22", "qr23", "qr24", "qr25"]
+    },
+
+    "Abstract Reasoning": {
+        "Pattern Recognition": ["ar1", "ar2", "ar3", "ar4", "ar5", "ar6", "ar7"],
+        "Spatial Reasoning": ["ar8", "ar9", "ar10", "ar11", "ar12", "ar13"],
+        "Logical Sequences": ["ar14", "ar15", "ar16", "ar17", "ar18", "ar19", "ar20"]
+    }
+}

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ASET Marking System{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    {% include "components/navbar.html" %}
+    {% include "components/flash.html" %}
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    {% include "components/footer.html" %}
+    <script src="/static/js/app.js" defer></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

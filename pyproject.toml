@@ -16,3 +16,19 @@ exclude = '''
 include = '\.pyi?$'
 line-length = 88
 target-version = ['py37']
+
+[project]
+name = "asetmarker"
+version = "0.1.0"
+description = "Web application for automated ASET exam marking built on the OMRChecker engine."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Everest Tutoring" }
+]
+license = { file = "LICENSE" }
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

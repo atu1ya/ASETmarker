@@ -1,0 +1,8 @@
+<div id="flash-container" class="flash-container">
+    {% for flash in messages | default([]) %}
+    <div class="flash flash-{{ flash.category | default('info') }}">
+        <span>{{ flash.message }}</span>
+        <button class="flash-close" type="button" onclick="this.parentElement.remove()">&times;</button>
+    </div>
+    {% endfor %}
+</div>

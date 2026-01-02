@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Dashboard &middot; ASET Marking System{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <h1>ASET Marking System Dashboard</h1>
+    <p class="text-muted">Load configuration files and start marking for the current session.</p>
+</section>
+
+{% set configured = config_status.configured %}
+<div id="config-status" class="config-status {{ 'configured' if configured else 'not-configured' }}">
+    {% if configured %}
+    <span class="config-status-icon">&#10003;</span>
+    <div>
+        <strong>Configuration Loaded</strong>
+        <div class="text-muted">
+            Reading: {{ config_status.reading_questions }} questions &middot;
+            QR/AR: {{ config_status.qrar_questions }} questions &middot;
+            Subjects: {{ config_status.subjects_mapped | join(', ') }}
+        </div>
+    </div>
+    {% else %}
+    <span class="config-status-icon">&#9888;</span>
+    <div>
+        <strong>No configuration loaded</strong>
+        <div class="text-muted">Upload answer keys and concept mapping to begin.</div>
+    </div>
+    {% endif %}
+</div>
+
+<section class="card" id="configuration-card">
+    <header class="card-header">
+        <h2 class="card-title">Step 1 &middot; Load Marking Configuration</h2>
+        <p class="card-subtitle">Upload the answer keys and concept mapping for this session.</p>
+    </header>
+    <form id="config-form" class="form" method="post" action="/configure" enctype="multipart/form-data">
+        <div class="form-group">
+            <label class="form-label" for="reading_answers">Reading Answer Key (.txt or .csv)</label>
+            <div class="file-input-wrapper">
+                <span class="file-icon">&#128462;</span>
+                <span class="file-text">Click to upload or drop file here</span>
+                <input type="file" id="reading_answers" name="reading_answers" accept=".txt,.csv" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="qrar_answers">QR/AR Answer Key (.txt or .csv)</label>
+            <div class="file-input-wrapper">
+                <span class="file-icon">&#128462;</span>
+                <span class="file-text">Click to upload or drop file here</span>
+                <input type="file" id="qrar_answers" name="qrar_answers" accept=".txt,.csv" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="concept_mapping">Concept Mapping (.json)</label>
+            <div class="file-input-wrapper">
+                <span class="file-icon">&#128462;</span>
+                <span class="file-text">Click to upload or drop file here</span>
+                <input type="file" id="concept_mapping" name="concept_mapping" accept=".json" required>
+            </div>
+            <p class="form-text">Need help? Review the <a href="/docs/sample_concept_mapping.json" download>sample concept mapping</a>.</p>
+        </div>
+        <button class="btn btn-primary" type="submit">Load Configuration</button>
+    </form>
+</section>
+
+<section class="card" id="mode-selection">
+    <header class="card-header">
+        <h2 class="card-title">Step 2 &middot; Choose Marking Mode</h2>
+        <p class="card-subtitle">Pick the workflow for this session. Options unlock after configuration.</p>
+    </header>
+    <div class="mode-cards">
+        <a href="/mark/single" class="mode-card {{ '' if configured else 'disabled' }}">
+            <div class="mode-card-icon">&#128100;</div>
+            <h3 class="mode-card-title">Single Student</h3>
+            <p class="mode-card-description">Upload one student's sheets to generate a personalised report.</p>
+        </a>
+        <a href="/batch" class="mode-card {{ '' if configured else 'disabled' }}">
+            <div class="mode-card-icon">&#128230;</div>
+            <h3 class="mode-card-title">Batch Processing</h3>
+            <p class="mode-card-description">Process a full class in one go with a manifest and sheet ZIP.</p>
+        </a>
+    </div>
+</section>
+{% endblock %}

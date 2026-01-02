@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Batch Processing &middot; ASET Marking System{% endblock %}
+
+{% block content %}
+<a href="/" class="btn btn-outline btn-sm mb-2">&larr; Back to Dashboard</a>
+<h1>Batch Processing</h1>
+<p class="text-muted">Process an entire class in one run using a manifest and ZIP of scans.</p>
+
+<section class="card mb-3">
+    <header class="card-header">
+        <h2 class="card-title">Configuration Summary</h2>
+        <p class="card-subtitle">The following configuration will be applied to all students.</p>
+    </header>
+    <ul>
+        <li><strong>Reading questions:</strong> {{ config_summary.reading_questions }}</li>
+        <li><strong>QR/AR questions:</strong> {{ config_summary.qrar_questions }}</li>
+        <li><strong>Mapped subjects:</strong> {{ config_summary.subjects | join(', ') }}</li>
+    </ul>
+</section>
+
+<section class="card" id="batch-form-container">
+    <header class="card-header">
+        <h2 class="card-title">Upload Manifest and Sheets</h2>
+        <p class="card-subtitle">Manifest file should list students with matching PNG filenames in the ZIP.</p>
+    </header>
+    <p>Manifest format:</p>
+<pre>{
+  "students": [
+    {
+      "name": "John Smith",
+      "writing_score": 85,
+      "reading_file": "john_reading.png",
+      "qrar_file": "john_qrar.png"
+    }
+  ]
+}
+</pre>
+    <p class="form-text">Download a <a href="/docs/sample_manifest.json" download>sample manifest</a> to get started.</p>
+    <form id="batch-form" method="post" action="/batch/process" enctype="multipart/form-data">
+        <div class="form-group">
+            <label class="form-label" for="manifest">Manifest (JSON)</label>
+            <div class="file-input-wrapper">
+                <span class="file-icon">&#128462;</span>
+                <span class="file-text">Click to upload or drop file here</span>
+                <input type="file" id="manifest" name="manifest" accept=".json" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="sheets_zip">Sheets Archive (ZIP of PNG files)</label>
+            <div class="file-input-wrapper">
+                <span class="file-icon">&#128230;</span>
+                <span class="file-text">Click to upload or drop file here</span>
+                <input type="file" id="sheets_zip" name="sheets_zip" accept=".zip" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Process Batch</button>
+    </form>
+</section>
+
+<section id="results-section" class="card results-section hidden">
+    <div class="results-icon">&#10003;</div>
+    <h2>Batch Download in progress</h2>
+    <p class="text-muted">Your ZIP download should begin shortly. If it does not, please retry.</p>
+    <button class="btn btn-outline" type="button" onclick="resetAndShowForm('batch-form-container', 'results-section')">Run Another Batch</button>
+</section>
+{% endblock %}

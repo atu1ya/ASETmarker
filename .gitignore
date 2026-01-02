@@ -12,3 +12,24 @@ outputs/*
 **/__pycache__
 venv/
 OMRChecker.wiki/
+
+# Python cache
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+
+# Environments
+.env
+.venv/
+venv/
+
+# Build artifacts
+build/
+dist/
+*.log
+
+# IDE files
+.vscode/
+.idea/

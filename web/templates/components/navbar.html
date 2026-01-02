@@ -1,0 +1,18 @@
+<nav class="navbar">
+    <a class="navbar-brand" href="/">ASET Marking System</a>
+    {% set is_authenticated = request.cookies.get('session_token') %}
+    <ul class="navbar-nav">
+        {% if is_authenticated %}
+        <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
+        <li><a href="/mark/single" class="{% if request.url.path.startswith('/mark') %}active{% endif %}">Single Marking</a></li>
+        <li><a href="/batch" class="{% if request.url.path.startswith('/batch') %}active{% endif %}">Batch Processing</a></li>
+        {% endif %}
+    </ul>
+    <div class="navbar-actions">
+        {% if is_authenticated %}
+        <a class="btn btn-outline btn-sm" href="/logout">Logout</a>
+        {% else %}
+        <a class="btn btn-primary btn-sm" href="/login">Login</a>
+        {% endif %}
+    </div>
+</nav>

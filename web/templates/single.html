@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Single Marking &middot; ASET Marking System{% endblock %}
+
+{% block content %}
+<a href="/" class="btn btn-outline btn-sm mb-2">&larr; Back to Dashboard</a>
+<h1>Single Student Marking</h1>
+<p class="text-muted">Upload a student's sheets and generate annotated outputs instantly.</p>
+
+<section class="card mb-3">
+    <header class="card-header">
+        <h2 class="card-title">Configuration Summary</h2>
+        <p class="card-subtitle">Review the configuration currently loaded for this session.</p>
+    </header>
+    <ul>
+        <li><strong>Reading questions:</strong> {{ config_summary.reading_questions }}</li>
+        <li><strong>QR/AR questions:</strong> {{ config_summary.qrar_questions }}</li>
+        <li><strong>Mapped subjects:</strong> {{ config_summary.subjects | join(', ') }}</li>
+    </ul>
+</section>
+
+<section id="marking-form-container" class="card">
+    <header class="card-header">
+        <h2 class="card-title">Upload Student Sheets</h2>
+        <p class="card-subtitle">Provide student details and PNG scans from Reading and QR/AR papers.</p>
+    </header>
+    <form id="marking-form" method="post" action="/mark/single/process" enctype="multipart/form-data">
+        <div class="form-group">
+            <label class="form-label" for="student_name">Student Name</label>
+            <input class="form-control" type="text" id="student_name" name="student_name" placeholder="e.g. Jamie Smith" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="writing_score">Writing Score (0-100)</label>
+            <input class="form-control" type="number" id="writing_score" name="writing_score" min="0" max="100" required>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="reading_sheet">Reading Sheet (PNG)</label>
+                <div class="file-input-wrapper">
+                    <span class="file-icon">&#128247;</span>
+                    <span class="file-text">Click to upload or drop file here</span>
+                    <input type="file" id="reading_sheet" name="reading_sheet" accept=".png" data-preview="reading-preview" required>
+                </div>
+                <img id="reading-preview" class="image-preview" alt="Reading sheet preview">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="qrar_sheet">QR/AR Sheet (PNG)</label>
+                <div class="file-input-wrapper">
+                    <span class="file-icon">&#128247;</span>
+                    <span class="file-text">Click to upload or drop file here</span>
+                    <input type="file" id="qrar_sheet" name="qrar_sheet" accept=".png" data-preview="qrar-preview" required>
+                </div>
+                <img id="qrar-preview" class="image-preview" alt="QR/AR sheet preview">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Mark &amp; Generate Report</button>
+    </form>
+</section>
+
+<section id="results-section" class="card results-section hidden">
+    <div class="results-icon">&#10003;</div>
+    <h2>Download in progress</h2>
+    <p class="text-muted">Your download should start automatically. If it does not, please try again.</p>
+    <button class="btn btn-outline" type="button" onclick="resetAndShowForm('marking-form-container', 'results-section')">Mark Another Student</button>
+</section>
+{% endblock %}

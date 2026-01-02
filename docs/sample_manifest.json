@@ -1,0 +1,10 @@
+{
+    "students": [
+        {
+            "name": "Jamie Student",
+            "writing_score": 82,
+            "reading_file": "jamie_reading.png",
+            "qrar_file": "jamie_qrar.png"
+        }
+    ]
+}
