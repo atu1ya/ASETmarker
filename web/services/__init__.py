@@ -1,7 +1,11 @@
 """Service layer for ASET Marking System."""
-from web.services.marker import MarkingService
-from web.services.analysis import AnalysisService
-from web.services.report import ReportService
-from web.services.annotator import AnnotatorService
+from .marker import MarkingService, QuestionResult, SubjectResult
+from .analysis import AnalysisService, LearningAreaResult, FullAnalysis
+from .report import ReportService
+from .annotator import AnnotatorService
 
-__all__ = ["MarkingService", "AnalysisService", "ReportService", "AnnotatorService"]
+__all__ = [
+	"MarkingService", "QuestionResult", "SubjectResult",
+	"AnalysisService", "LearningAreaResult", "FullAnalysis",
+	"ReportService", "AnnotatorService"
+]

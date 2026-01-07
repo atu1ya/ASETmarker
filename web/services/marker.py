@@ -1,23 +1,104 @@
-"""
-Marking service that wraps the existing OMR logic.
-STUB IMPLEMENTATION - Full implementation in Milestone 2.
-"""
+from __future__ import annotations
+from dataclasses import dataclass, field
 from pathlib import Path
-import numpy as np
+from typing import Any, Dict, List
 
+import cv2
+import numpy as np
+from dotmap import DotMap
+
+# --- Legacy OMR Engine Imports ---
+from src.defaults import CONFIG_DEFAULTS
+from src.template import Template
+from src.core import ImageInstanceOps
+from src.utils.parsing import get_concatenated_response
+from src.processors.FeatureBasedAlignment import FeatureBasedAlignment
+
+# Register FeatureBasedAlignment (required for templates)
+from src.processors import manager as processor_manager
+processor_manager.PROCESSOR_MANAGER.processors["FeatureBasedAlignment"] = FeatureBasedAlignment
+
+@dataclass
+class QuestionResult:
+    label: str
+    marked_value: str
+    correct_value: str
+    is_correct: bool
+
+@dataclass
+class SubjectResult:
+    subject_name: str
+    score: int
+    total_questions: int
+    results: List[QuestionResult]
+    omr_response: Dict[str, str]
+    marked_image: Any = field(repr=False)
 
 class MarkingService:
-    """Service for processing OMR sheets and extracting responses."""
-
     def __init__(self, config_dir: Path):
-        self.config_dir = config_dir
-        self.reading_template = None
-        self.qrar_template = None
+        self.config_dir = Path(config_dir)
+        self.tuning_config = DotMap(CONFIG_DEFAULTS)
+        self.tuning_config.outputs.save_image_level = 0  # Prevent disk writes
 
-    def initialize_templates(self) -> None:
-        """Load OMR templates from config directory."""
-        # STUB - will load actual templates in M2
-        return None
+    def process_single_subject(
+        self,
+        image_bytes: bytes,
+        answer_key: Dict[str, str],
+        template_filename: str,
+        subject_name: str = "OMR"
+    ) -> SubjectResult:
+        # Decode image bytes to grayscale
+        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            raise ValueError("Could not decode image bytes to a valid grayscale image.")
+
+        # Template path
+        template_path = self.config_dir / template_filename
+        if not template_path.exists():
+            raise FileNotFoundError(f"Template file not found: {template_path}")
+
+        # Load Template
+        template = Template(template_path, self.tuning_config)
+
+        # ImageInstanceOps
+        ops = ImageInstanceOps(self.tuning_config)
+
+        # Preprocess
+        processed_image = ops.apply_preprocessors("dummy_path", image, template)
+
+        # OMR Response
+        omr_response, final_marked, multi_marked, multi_roll = ops.read_omr_response(
+            template, processed_image, "dummy_name"
+        )
+
+        # Normalize output
+        clean_response = get_concatenated_response(omr_response, template)
+
+        # Scoring
+        results: List[QuestionResult] = []
+        correct = 0
+        for label, correct_value in answer_key.items():
+            marked_value = clean_response.get(label, "")
+            is_correct = (marked_value == correct_value)
+            if is_correct:
+                correct += 1
+            results.append(QuestionResult(
+                label=label,
+                marked_value=marked_value,
+                correct_value=correct_value,
+                is_correct=is_correct
+            ))
+
+        return SubjectResult(
+            subject_name=subject_name,
+            score=correct,
+            total_questions=len(answer_key),
+            results=results,
+            omr_response=clean_response,
+            marked_image=final_marked
+        )
+
 
     def mark_reading_sheet(self, image_bytes: bytes, answer_key: list[str]) -> dict:
         """
