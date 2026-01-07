@@ -1,0 +1,74 @@
+{
+  "pageDimensions": [1653, 2339],
+  "bubbleDimensions": [24, 17],
+
+  "preProcessors": [
+    {
+      "name": "FeatureBasedAlignment",
+      "options": {
+        "reference": "reference_reading.jpg",
+        "maxFeatures": 1000,
+        "goodMatchPercent": 0.15,
+        "2d": true
+      }
+    }
+  ],
+
+  "fieldBlocks": {
+    "RC_Q1_10": {
+      "direction": "horizontal",
+      "bubbleValues": ["A", "B", "C", "D"],
+      "fieldLabels": [
+        "RC1", "RC2", "RC3", "RC4", "RC5",
+        "RC6", "RC7", "RC8", "RC9", "RC10"
+      ],
+      "origin": [250, 1198],
+      "bubblesGap": 67,
+      "labelsGap": 50
+    },
+
+    "RC_Q11_20": {
+      "direction": "horizontal",
+      "bubbleValues": ["A", "B", "C", "D"],
+      "fieldLabels": [
+        "RC11", "RC12", "RC13", "RC14", "RC15",
+        "RC16", "RC17", "RC18", "RC19", "RC20"
+      ],
+      "origin": [585, 1198],
+      "bubblesGap": 67,
+      "labelsGap": 50
+    },
+
+    "RC_Q21_30": {
+      "direction": "horizontal",
+      "bubbleValues": ["A", "B", "C", "D"],
+      "fieldLabels": [
+        "RC21", "RC22", "RC23", "RC24", "RC25",
+        "RC26", "RC27", "RC28", "RC29", "RC30"
+      ],
+      "origin": [918, 1198],
+      "bubblesGap": 67,
+      "labelsGap": 50
+    },
+
+    "RC_Q31_35": {
+      "direction": "horizontal",
+      "bubbleValues": ["A", "B", "C", "D"],
+      "fieldLabels": [
+        "RC31", "RC32", "RC33", "RC34", "RC35"
+      ],
+      "origin": [1250, 1198],
+      "bubblesGap": 67,
+      "labelsGap": 50
+    }
+  },
+
+  "outputColumns": [
+    "RC1", "RC2", "RC3", "RC4", "RC5", "RC6", "RC7", "RC8", "RC9", "RC10",
+    "RC11", "RC12", "RC13", "RC14", "RC15", "RC16", "RC17", "RC18", "RC19", "RC20",
+    "RC21", "RC22", "RC23", "RC24", "RC25", "RC26", "RC27", "RC28", "RC29", "RC30",
+    "RC31", "RC32", "RC33", "RC34", "RC35"
+  ],
+
+  "emptyValue": ""
+}
