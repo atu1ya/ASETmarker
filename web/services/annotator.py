@@ -2,50 +2,50 @@
 Annotated sheet generation service.
 STUB IMPLEMENTATION - Full implementation in Milestone 3.
 """
+import cv2
 import numpy as np
+from io import BytesIO
+from PIL import Image
+from typing import Any
+from web.services.marker import SubjectResult
 
 
 class AnnotatorService:
     """Generates annotated marked sheets highlighting correct/incorrect answers."""
 
-    INCORRECT_COLOR = (0, 0, 255)  # Red in BGR
-    CORRECT_COLOR = (0, 255, 0)  # Green in BGR
 
-    def annotate_sheet(
-        self,
-        marked_image: np.ndarray,
-        question_results: list[dict],
-        subject: str,
-        score: dict,
-    ) -> np.ndarray:
+    def annotate_sheet(self, result: SubjectResult) -> bytes:
         """
-        Annotate a marked sheet with visual indicators.
-
-        STUB: Returns the image as-is.
+        Overlays the score on the marked image and returns PDF bytes.
         """
-        return marked_image
-
-    def image_to_pdf_bytes(self, image: np.ndarray) -> bytes:
-        """Convert image to PDF bytes.
-
-        STUB: Returns minimal valid PDF.
-        """
-        pdf_content = b"""%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj
-4 0 obj << /Length 47 >> stream
-BT /F1 12 Tf 100 700 Td (STUB ANNOTATED) Tj ET
-endstream endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000214 00000 n 
-trailer << /Size 5 /Root 1 0 R >>
-startxref
-310
-%%EOF"""
-        return pdf_content
+        if result.marked_image is None:
+            raise ValueError("No marked image found in SubjectResult.")
+        img = result.marked_image.copy()
+        h, w = img.shape[:2]
+        text = f"Score: {result.score} / {result.total_questions}"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.2
+        thickness = 3
+        text_size, _ = cv2.getTextSize(text, font, font_scale, thickness)
+        text_w, text_h = text_size
+        # Padding around text
+        pad_x, pad_y = 20, 20
+        # Position: top-right with margin
+        x = w - text_w - pad_x
+        y = pad_y + text_h
+        # Draw white rectangle for background
+        rect_x1 = x - 10
+        rect_y1 = y - text_h - 10
+        rect_x2 = x + text_w + 10
+        rect_y2 = y + 10
+        cv2.rectangle(img, (rect_x1, rect_y1), (rect_x2, rect_y2), (255, 255, 255), -1)
+        # Draw border (branding color)
+        cv2.rectangle(img, (rect_x1, rect_y1), (rect_x2, rect_y2), (52, 152, 219), 3)
+        # Put text (branding color)
+        cv2.putText(img, text, (x, y), font, font_scale, (44, 62, 80), thickness, cv2.LINE_AA)
+        # Convert to RGB for PIL
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        pil_img = Image.fromarray(img_rgb)
+        buffer = BytesIO()
+        pil_img.save(buffer, format="PDF")
+        return buffer.getvalue()
