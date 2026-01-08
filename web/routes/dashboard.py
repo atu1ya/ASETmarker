@@ -101,7 +101,7 @@ def get_configuration_status(session_token: str) -> dict:
         "subjects_mapped": [
             subject for subject in config.concept_mapping.keys() if not subject.startswith("_")
         ],
-        "uploaded_at": config.uploaded_at,
+        "uploaded_at": config.uploaded_at.isoformat() if config.uploaded_at else None,
     }
 
 
