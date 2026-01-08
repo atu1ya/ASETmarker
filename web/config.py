@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False, description="Enable FastAPI debug mode")
     SESSION_DURATION_HOURS: int = Field(default=8, ge=1, description="Session lifetime")
     MAX_UPLOAD_SIZE_MB: int = Field(default=50, ge=1, description="Maximum upload size")
-    ALLOWED_EXTENSIONS: list[str] = Field(default_factory=lambda: [".png"])
+    ALLOWED_EXTENSIONS: list[str] = Field(default_factory=lambda: [".png", ".jpg", ".jpeg"])
     CONFIG_DIR: Path = Field(
         default=Path(__file__).resolve().parent.parent / "config",
         description="Directory containing OMR configuration templates",

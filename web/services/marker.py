@@ -3,8 +3,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-# --- PNG Signature for validation ---
+# --- Image format signatures for validation ---
 PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
+JPEG_SIGNATURE = b'\xff\xd8\xff'
 
 # --- MarkingResult and QRARMarkingResult ---
 @dataclass
@@ -67,9 +68,10 @@ class MarkingService:
         self.tuning_config.outputs.save_image_level = 0  # Prevent disk writes
 
 
-    def _validate_png(self, image_bytes: bytes) -> None:
-        if not image_bytes.startswith(PNG_SIGNATURE):
-            raise ValueError("Input image is not a valid PNG file.")
+    def _validate_image(self, image_bytes: bytes) -> None:
+        """Validate that the image is either PNG or JPEG format."""
+        if not (image_bytes.startswith(PNG_SIGNATURE) or image_bytes.startswith(JPEG_SIGNATURE)):
+            raise ValueError("Input image must be a valid PNG or JPEG file.")
 
     def _bytes_to_cv_image(self, image_bytes: bytes) -> np.ndarray:
         image_array = np.frombuffer(image_bytes, dtype=np.uint8)
@@ -115,7 +117,7 @@ class MarkingService:
         template_filename: str,
         subject_name: str = "OMR"
     ) -> SubjectResult:
-        self._validate_png(image_bytes)
+        self._validate_image(image_bytes)
         image = self._bytes_to_cv_image(image_bytes)
         template = self._load_template(template_filename)
         omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
@@ -136,7 +138,7 @@ class MarkingService:
         Process a reading sheet and return a MarkingResult dataclass.
         """
         try:
-            self._validate_png(image_bytes)
+            self._validate_image(image_bytes)
             image = self._bytes_to_cv_image(image_bytes)
             template = self._load_template(template_filename)
             omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
@@ -179,7 +181,7 @@ class MarkingService:
         Process a QR/AR sheet and return a QRARMarkingResult dataclass.
         """
         try:
-            self._validate_png(image_bytes)
+            self._validate_image(image_bytes)
             image = self._bytes_to_cv_image(image_bytes)
             template = self._load_template(template_filename)
             omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
