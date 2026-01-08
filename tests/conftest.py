@@ -27,7 +27,8 @@ def configured_client(authenticated_client: TestClient) -> TestClient:
 
     config = MarkingConfiguration(
         reading_answers=["A", "B", "C", "D"] * 8,
-        qrar_answers=["A", "B", "C", "D", "E"] * 9,
+        qr_answers=["A", "B", "C", "D", "E"] * 5,
+        ar_answers=["A", "B", "C", "D"] * 5,
         concept_mapping={
             "Reading": {"Area1": ["q1", "q2"], "Area2": ["q3", "q4"]},
             "Quantitative Reasoning": {"Area1": ["qr1", "qr2"]},

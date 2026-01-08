@@ -17,7 +17,8 @@ def test_dashboard_authenticated(authenticated_client):
 
 def test_configure_route(authenticated_client):
     reading = io.BytesIO(b"A\nB\n")
-    qrar = io.BytesIO(b"A\nB\n")
+    qr = io.BytesIO(b"A\nB\n")
+    ar = io.BytesIO(b"C\nD\n")
     concept = io.BytesIO(
         json.dumps(
             {
@@ -30,7 +31,8 @@ def test_configure_route(authenticated_client):
 
     files = {
         "reading_answers": ("reading.txt", reading, "text/plain"),
-        "qrar_answers": ("qrar.txt", qrar, "text/plain"),
+        "qr_answers": ("qr.txt", qr, "text/plain"),
+        "ar_answers": ("ar.txt", ar, "text/plain"),
         "concept_mapping": ("concept.json", concept, "application/json"),
     }
 

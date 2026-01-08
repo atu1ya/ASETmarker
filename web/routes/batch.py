@@ -72,7 +72,8 @@ async def batch_page(request: Request, config: MarkingConfiguration = Depends(re
     """Render the batch processing page."""
     summary = {
         "reading_questions": len(config.reading_answers),
-        "qrar_questions": len(config.qrar_answers),
+        "qr_questions": len(config.qr_answers),
+        "ar_questions": len(config.ar_answers),
         "subjects": [
             subject for subject in config.concept_mapping.keys() if not subject.startswith("_")
         ],
@@ -139,7 +140,9 @@ async def process_batch(
             base_path = f"{folder_name}/"
             # Convert answer keys to dicts (label: answer)
             reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
-            qrar_key = {str(i+1): ans for i, ans in enumerate(config.qrar_answers)}
+            # Combine QR and AR answer keys for the QRAR sheet
+            combined_qrar = config.qr_answers + config.ar_answers
+            qrar_key = {str(i+1): ans for i, ans in enumerate(combined_qrar)}
             # Try to read files and process
             try:
                 reading_bytes = sheets_archive_ctx.read(reading_file)

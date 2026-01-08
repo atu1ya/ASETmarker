@@ -48,7 +48,8 @@ async def single_marking_page(
     """Render the single student marking page."""
     summary = {
         "reading_questions": len(config.reading_answers),
-        "qrar_questions": len(config.qrar_answers),
+        "qr_questions": len(config.qr_answers),
+        "ar_questions": len(config.ar_answers),
         "subjects": [
             subject for subject in config.concept_mapping.keys() if not subject.startswith("_")
         ],
@@ -129,7 +130,9 @@ async def process_single_student(
         )
     
     if qrar_bytes:
-        qrar_key = {str(i+1): ans for i, ans in enumerate(config.qrar_answers)}
+        # Combine QR and AR answer keys for the QRAR sheet
+        combined_qrar = config.qr_answers + config.ar_answers
+        qrar_key = {str(i+1): ans for i, ans in enumerate(combined_qrar)}
         qrar_result = marking_service.process_single_subject(
             subject_name="QR/AR",
             image_bytes=qrar_bytes,
