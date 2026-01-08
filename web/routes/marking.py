@@ -53,6 +53,7 @@ async def single_marking_page(
         "subjects": [
             subject for subject in config.concept_mapping.keys() if not subject.startswith("_")
         ],
+        "has_concept_mapping": config.has_concept_mapping,
     }
     return templates.TemplateResponse(
         "single.html",
@@ -163,8 +164,8 @@ async def process_single_student(
             qrar_pdf = annotator_service.image_to_pdf_bytes(qrar_img)
             bundle.writestr(f"{folder_name}_QRAR_Marked.pdf", qrar_pdf)
         
-        # Generate report and analysis only if requested and both files provided
-        if generate_report and reading_result and qrar_result:
+        # Generate report and analysis only if requested, both files provided, and concept mapping exists
+        if generate_report and reading_result and qrar_result and config.has_concept_mapping:
             analysis_service = AnalysisService(config.concept_mapping)
             full_analysis = analysis_service.generate_full_analysis(
                 reading_result,

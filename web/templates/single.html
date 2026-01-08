@@ -56,9 +56,12 @@
         </div>
         <div class="form-group">
             <label class="form-label">
-                <input type="checkbox" id="generate_report" name="generate_report" value="true">
-                Generate full report with analysis <small class="text-muted">(requires both Reading and QR/AR sheets)</small>
+                <input type="checkbox" id="generate_report" name="generate_report" value="true" {% if not config_summary.has_concept_mapping %}disabled{% endif %}>
+                Generate full report with analysis <small class="text-muted">(requires both Reading and QR/AR sheets{% if not config_summary.has_concept_mapping %} and concept mapping{% endif %})</small>
             </label>
+            {% if not config_summary.has_concept_mapping %}
+            <p class="text-muted" style="margin-left: 1.5rem; font-size: 0.875rem;">⚠️ Upload concept mapping in configuration to enable reports</p>
+            {% endif %}
         </div>
         <button type="submit" class="btn btn-primary">Mark Sheets</button>
     </form>

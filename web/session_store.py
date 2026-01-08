@@ -21,7 +21,11 @@ class MarkingConfiguration:
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.reading_answers and self.qr_answers and self.ar_answers and self.concept_mapping)
+        return bool(self.reading_answers and self.qr_answers and self.ar_answers)
+    
+    @property
+    def has_concept_mapping(self) -> bool:
+        return bool(self.concept_mapping)
 
 
 class SessionConfigStore:

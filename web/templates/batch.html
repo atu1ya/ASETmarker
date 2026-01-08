@@ -17,6 +17,9 @@
         <li><strong>QR questions:</strong> {{ config_summary.qr_questions }}</li>
         <li><strong>AR questions:</strong> {{ config_summary.ar_questions }}</li>
         <li><strong>Mapped subjects:</strong> {{ config_summary.subjects | join(', ') }}</li>
+        {% if not config_summary.has_concept_mapping %}
+        <li><strong>⚠️ Note:</strong> <span class="text-muted">No concept mapping uploaded - reports will not be generated</span></li>
+        {% endif %}
     </ul>
 </section>
 

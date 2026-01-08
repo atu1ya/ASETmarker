@@ -77,6 +77,7 @@ async def batch_page(request: Request, config: MarkingConfiguration = Depends(re
         "subjects": [
             subject for subject in config.concept_mapping.keys() if not subject.startswith("_")
         ],
+        "has_concept_mapping": config.has_concept_mapping,
     }
     return templates.TemplateResponse(
         "batch.html",
@@ -127,8 +128,8 @@ async def process_batch(
             )
 
         marking_service = MarkingService(settings.CONFIG_DIR)
-        analysis_service = AnalysisService(config.concept_mapping)
-        report_service = ReportService()
+        analysis_service = AnalysisService(config.concept_mapping) if config.has_concept_mapping else None
+        report_service = ReportService() if config.has_concept_mapping else None
         annotator_service = AnnotatorService()
 
         def _process_batch_student(student, sheets_archive_ctx):
@@ -159,20 +160,31 @@ async def process_batch(
                     answer_key=qrar_key,
                     template_filename="aset_qrar_template.json",
                 )
-                # Analysis
-                full_analysis = analysis_service.generate_full_analysis(
-                    reading_result,
-                    qrar_result,
-                    empty_ar,
-                )
-                # Artifact Generation
-                report_pdf = report_service.generate_student_report(full_analysis)
+                
+                # Annotate sheets
                 reading_img = annotator_service.annotate_sheet(reading_result)
                 qrar_img = annotator_service.annotate_sheet(qrar_result)
                 reading_pdf = annotator_service.image_to_pdf_bytes(reading_img)
                 qrar_pdf = annotator_service.image_to_pdf_bytes(qrar_img)
-                # JSON results
-                results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
+                
+                artifacts = [
+                    (base_path + "Reading_Marked.pdf", reading_pdf),
+                    (base_path + "QRAR_Marked.pdf", qrar_pdf),
+                ]
+                
+                # Generate analysis and report only if concept mapping exists
+                if analysis_service and report_service:
+                    full_analysis = analysis_service.generate_full_analysis(
+                        reading_result,
+                        qrar_result,
+                        empty_ar,
+                    )
+                    report_pdf = report_service.generate_student_report(full_analysis)
+                    results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
+                    artifacts.extend([
+                        (base_path + "Report.pdf", report_pdf),
+                        (base_path + "results.json", results_json),
+                    ])
                 return {
                     "status": "Success",
                     "student_name": student_name,
@@ -181,12 +193,7 @@ async def process_batch(
                     "qr_score": getattr(qrar_result, 'score', ''),
                     "ar_score": '',
                     "notes": '',
-                    "artifacts": [
-                        (base_path + "Report.pdf", report_pdf),
-                        (base_path + "Reading_Marked.pdf", reading_pdf),
-                        (base_path + "QRAR_Marked.pdf", qrar_pdf),
-                        (base_path + "results.json", results_json),
-                    ]
+                    "artifacts": artifacts,
                 }
             except Exception as e:
                 return {

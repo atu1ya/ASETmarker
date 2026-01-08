@@ -102,6 +102,7 @@ def get_configuration_status(session_token: str) -> dict:
             subject for subject in config.concept_mapping.keys() if not subject.startswith("_")
         ],
         "uploaded_at": config.uploaded_at.isoformat() if config.uploaded_at else None,
+        "has_concept_mapping": config.has_concept_mapping,
     }
 
 
@@ -131,7 +132,7 @@ async def configure_marking(
     reading_answers: UploadFile = File(...),
     qr_answers: UploadFile = File(...),
     ar_answers: UploadFile = File(...),
-    concept_mapping: UploadFile = File(...),
+    concept_mapping: UploadFile = File(None),
 ):
     """Upload and store marking configuration for the current session."""
     def _validate_extension(upload: UploadFile, allowed: set[str]) -> None:
@@ -145,12 +146,10 @@ async def configure_marking(
     _validate_extension(reading_answers, ALLOWED_TEXT_EXTENSIONS)
     _validate_extension(qr_answers, ALLOWED_TEXT_EXTENSIONS)
     _validate_extension(ar_answers, ALLOWED_TEXT_EXTENSIONS)
-    _validate_extension(concept_mapping, {".json"})
 
     reading_content = (await reading_answers.read()).decode("utf-8", errors="ignore")
     qr_content = (await qr_answers.read()).decode("utf-8", errors="ignore")
     ar_content = (await ar_answers.read()).decode("utf-8", errors="ignore")
-    concept_content = (await concept_mapping.read()).decode("utf-8", errors="ignore")
 
     reading_list = parse_answer_key(reading_content)
     qr_list = parse_answer_key(qr_content)
@@ -162,20 +161,24 @@ async def configure_marking(
             detail="Answer keys must contain at least one entry.",
         )
 
-    try:
-        concepts = json.loads(concept_content)
-    except json.JSONDecodeError as exc:  # pragma: no cover - simple parse failure
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Concept mapping must be valid JSON.",
-        ) from exc
+    concepts = {}
+    if concept_mapping and concept_mapping.filename:
+        _validate_extension(concept_mapping, {".json"})
+        concept_content = (await concept_mapping.read()).decode("utf-8", errors="ignore")
+        try:
+            concepts = json.loads(concept_content)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Concept mapping must be valid JSON.",
+            ) from exc
 
-    validation_errors = validate_concept_mapping(concepts)
-    if validation_errors:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="; ".join(validation_errors),
-        )
+        validation_errors = validate_concept_mapping(concepts)
+        if validation_errors:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="; ".join(validation_errors),
+            )
 
     config = MarkingConfiguration(
         reading_answers=reading_list,
