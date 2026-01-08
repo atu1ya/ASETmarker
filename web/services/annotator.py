@@ -14,13 +14,16 @@ class AnnotatorService:
     """Generates annotated marked sheets highlighting correct/incorrect answers."""
 
 
-    def annotate_sheet(self, result: SubjectResult) -> bytes:
+    def annotate_sheet(self, result: SubjectResult) -> np.ndarray:
         """
-        Overlays the score on the marked image and returns PDF bytes.
+        Overlays the score on the marked image and returns the annotated image (np.ndarray).
         """
         if result.marked_image is None:
             raise ValueError("No marked image found in SubjectResult.")
         img = result.marked_image.copy()
+        # Ensure 3 channels for color annotation
+        if len(img.shape) == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         h, w = img.shape[:2]
         text = f"Score: {result.score} / {result.total_questions}"
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -43,8 +46,17 @@ class AnnotatorService:
         cv2.rectangle(img, (rect_x1, rect_y1), (rect_x2, rect_y2), (52, 152, 219), 3)
         # Put text (branding color)
         cv2.putText(img, text, (x, y), font, font_scale, (44, 62, 80), thickness, cv2.LINE_AA)
-        # Convert to RGB for PIL
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        return img
+
+    def image_to_pdf_bytes(self, img: np.ndarray) -> bytes:
+        """
+        Converts an annotated image (np.ndarray) to PDF bytes.
+        """
+        # Ensure RGB for PIL
+        if len(img.shape) == 2:
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        else:
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         pil_img = Image.fromarray(img_rgb)
         buffer = BytesIO()
         pil_img.save(buffer, format="PDF")

@@ -93,6 +93,8 @@ async def process_batch(
     config: MarkingConfiguration = Depends(require_configuration),
 ):
     """Process batch uploads and return a ZIP archive with per-student results."""
+    from web.services.marker import SubjectResult
+    empty_ar = SubjectResult(subject_name="AR", score=0, total_questions=0, results=[], marked_image=None, omr_response={})
     _validate_extension(manifest, {".json"})
     _validate_extension(sheets_zip, {".zip"})
 
@@ -120,101 +122,74 @@ async def process_batch(
             detail="Uploaded ZIP exceeds the allowed size for batch processing.",
         )
 
+
+    import dataclasses
     marking_service = MarkingService(settings.CONFIG_DIR)
     analysis_service = AnalysisService(config.concept_mapping)
-    report_service = ReportService(settings.ASSETS_DIR)
+    report_service = ReportService()
     annotator_service = AnnotatorService()
 
     output_buffer = io.BytesIO()
     try:
         sheets_io = io.BytesIO(sheets_bytes)
         with ZipFile(sheets_io) as sheets_archive_ctx, ZipFile(output_buffer, "w") as results_zip:
-        for student in manifest_json["students"]:
-            student_name = student["name"]
-            writing_score = student["writing_score"]
-            reading_file = student["reading_file"]
-            qrar_file = student["qrar_file"]
+            for student in manifest_json["students"]:
+                student_name = student["name"]
+                writing_score = student["writing_score"]
+                reading_file = student["reading_file"]
+                qrar_file = student["qrar_file"]
 
-            try:
-                reading_bytes = sheets_archive_ctx.read(reading_file)
-                qrar_bytes = sheets_archive_ctx.read(qrar_file)
-            except KeyError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Missing file '{exc.args[0]}' in sheets ZIP.",
-                ) from exc
+                try:
+                    reading_bytes = sheets_archive_ctx.read(reading_file)
+                    qrar_bytes = sheets_archive_ctx.read(qrar_file)
+                except KeyError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Missing file '{exc.args[0]}' in sheets ZIP.",
+                    ) from exc
 
-            reading_result = marking_service.mark_reading_sheet(reading_bytes, config.reading_answers)
-            qrar_result = marking_service.mark_qrar_sheet(qrar_bytes, config.qrar_answers)
+                # Marking
+                # Convert answer keys to dicts (label: answer)
+                reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
+                qrar_key = {str(i+1): ans for i, ans in enumerate(config.qrar_answers)}
 
-            reading_score = reading_result["results"]
-            qr_score = qrar_result["qr"]
-            ar_score = qrar_result["ar"]
-
-            analysis = analysis_service.generate_full_analysis(
-                reading_score,
-                qr_score,
-                ar_score,
-                writing_score,
-            )
-
-            reading_pdf = annotator_service.image_to_pdf_bytes(
-                annotator_service.annotate_sheet(
-                    reading_result["marked_image"],
-                    reading_score.get("questions", []),
-                    "Reading",
-                    reading_score,
+                reading_result = marking_service.process_single_subject(
+                    subject_name="Reading",
+                    image_bytes=reading_bytes,
+                    answer_key=reading_key,
+                    template_filename="config/aset_reading_template.json",
                 )
-            )
-            qr_pdf = annotator_service.image_to_pdf_bytes(
-                annotator_service.annotate_sheet(
-                    qrar_result["marked_image"],
-                    qr_score.get("questions", []),
-                    "Quantitative Reasoning",
-                    qr_score,
+                qrar_result = marking_service.process_single_subject(
+                    subject_name="QR/AR",
+                    image_bytes=qrar_bytes,
+                    answer_key=qrar_key,
+                    template_filename="config/aset_qrar_template.json",
                 )
-            )
-            ar_pdf = annotator_service.image_to_pdf_bytes(
-                annotator_service.annotate_sheet(
-                    qrar_result["marked_image"],
-                    ar_score.get("questions", []),
-                    "Abstract Reasoning",
-                    ar_score,
+
+                # Analysis
+                full_analysis = analysis_service.generate_full_analysis(
+                    reading_result,
+                    qrar_result,
+                    empty_ar,
                 )
-            )
 
-            report_pdf = report_service.generate_student_report(
-                student_name,
-                reading_score,
-                qr_score,
-                ar_score,
-                writing_score,
-                analysis,
-            )
+                # Artifact Generation
 
-            results_payload: dict[str, Any] = {
-                "student": student_name,
-                "writing_score": writing_score,
-                "reading": reading_score,
-                "quantitative_reasoning": qr_score,
-                "abstract_reasoning": ar_score,
-                "analysis": analysis,
-                "multi_marked": {
-                    "reading": reading_result.get("multi_marked", False),
-                    "qrar": qrar_result.get("multi_marked", False),
-                },
-            }
+                report_pdf = report_service.generate_student_report(full_analysis)
+                reading_img = annotator_service.annotate_sheet(reading_result)
+                qrar_img = annotator_service.annotate_sheet(qrar_result)
+                reading_pdf = annotator_service.image_to_pdf_bytes(reading_img)
+                qrar_pdf = annotator_service.image_to_pdf_bytes(qrar_img)
 
-            folder_name = _sanitize_name(student_name)
-            base_path = f"{folder_name}/"
-            results_zip.writestr(base_path + "report.pdf", report_pdf)
-            results_zip.writestr(base_path + "reading_annotated.pdf", reading_pdf)
-            results_zip.writestr(base_path + "qr_annotated.pdf", qr_pdf)
-            results_zip.writestr(base_path + "ar_annotated.pdf", ar_pdf)
-            results_zip.writestr(
-                base_path + "results.json",
-                json.dumps(results_payload, indent=2).encode("utf-8"),
-            )
+                # JSON results
+                results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
+
+                folder_name = _sanitize_name(student_name)
+                base_path = f"{folder_name}/"
+                results_zip.writestr(base_path + "Report.pdf", report_pdf)
+                results_zip.writestr(base_path + "Reading_Marked.pdf", reading_pdf)
+                results_zip.writestr(base_path + "QRAR_Marked.pdf", qrar_pdf)
+                results_zip.writestr(base_path + "results.json", results_json)
 
     except BadZipFile as exc:
         raise HTTPException(

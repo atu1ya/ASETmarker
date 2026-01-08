@@ -2,6 +2,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Any
 from .marker import SubjectResult
+@dataclass
+class SubjectAnalysis:
+    subject: str
+    area_results: List[LearningAreaResult]
+    unmapped_questions: List[str] = field(default_factory=list)
+
 
 @dataclass
 class LearningAreaResult:
@@ -25,15 +31,16 @@ class AnalysisService:
         """
         self.concept_map = concept_map
 
-    def analyze_subject(
+    def analyze_subject_performance(
         self,
         subject: str,
         question_results: List[Dict[str, Any]]
-    ) -> List[LearningAreaResult]:
+    ) -> SubjectAnalysis:
         # Build lookup for question correctness
         correct_lookup = {q["label"]: q["is_correct"] for q in question_results}
         subject_map = self.concept_map.get(subject, {})
         area_results: List[LearningAreaResult] = []
+        mapped_questions = set()
         for area, questions in subject_map.items():
             total = len(questions)
             correct = sum(1 for q in questions if correct_lookup.get(q, False))
@@ -46,9 +53,18 @@ class AnalysisService:
                 percentage=percentage,
                 status=status
             ))
-        return area_results
+            mapped_questions.update(questions)
+        # Find unmapped questions
+        all_labels = set(correct_lookup.keys())
+        unmapped = list(all_labels - mapped_questions)
+        return SubjectAnalysis(
+            subject=subject,
+            area_results=area_results,
+            unmapped_questions=unmapped
+        )
 
-    def compile_full_analysis(
+
+    def generate_full_analysis(
         self,
         reading: SubjectResult,
         qr: SubjectResult,
@@ -59,14 +75,14 @@ class AnalysisService:
         for subj, result in zip([
             "Reading", "Quantitative Reasoning", "Abstract Reasoning"
         ], [reading, qr, ar]):
-            areas = self.analyze_subject(subj, [
+            analysis = self.analyze_subject_performance(subj, [
                 {"label": q.label, "is_correct": q.is_correct} for q in result.results
             ])
-            subject_areas[subj] = areas
+            subject_areas[subj] = analysis.area_results
             summary[subj] = {
-                "done_well": [a.area for a in areas if a.status == "Done well"],
-                "needs_improvement": [a.area for a in areas if a.status == "Needs improvement"]
+                "done_well": [a.area for a in analysis.area_results if a.status == "Done well"],
+                "needs_improvement": [a.area for a in analysis.area_results if a.status == "Needs improvement"],
+                "unmapped_questions": analysis.unmapped_questions
             }
-
         return FullAnalysis(subject_areas=subject_areas, summary=summary)
 
