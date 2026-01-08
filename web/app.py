@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -58,7 +58,14 @@ async def health_check() -> dict[str, str]:
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Custom HTTP exception responses."""
     if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+        # Check if request accepts HTML (browser request)
+        accept_header = request.headers.get("accept", "")
+        if "text/html" in accept_header:
+            # Redirect to login page for browser requests
+            return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+        # Return JSON for API requests
         detail = exc.detail or "Authentication required."
+        return JSONResponse({"detail": detail}, status_code=exc.status_code)
     elif exc.status_code == status.HTTP_404_NOT_FOUND:
         detail = exc.detail or "The requested resource was not found."
     else:
