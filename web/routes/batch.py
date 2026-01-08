@@ -1,3 +1,4 @@
+import csv
 """Batch processing routes."""
 from __future__ import annotations
 
@@ -87,72 +88,63 @@ async def batch_page(request: Request, config: MarkingConfiguration = Depends(re
 
 @router.post("/process")
 async def process_batch(
-    manifest: UploadFile = File(...),
-    sheets_zip: UploadFile = File(...),
-    settings: Settings = Depends(get_settings),
-    config: MarkingConfiguration = Depends(require_configuration),
-):
-    """Process batch uploads and return a ZIP archive with per-student results."""
-    from web.services.marker import SubjectResult
-    empty_ar = SubjectResult(subject_name="AR", score=0, total_questions=0, results=[], marked_image=None, omr_response={})
-    _validate_extension(manifest, {".json"})
-    _validate_extension(sheets_zip, {".zip"})
 
-    manifest_data = (await manifest.read()).decode("utf-8", errors="ignore")
-    try:
-        manifest_json = json.loads(manifest_data)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Manifest file must contain valid JSON.",
-        ) from exc
+    async def process_batch(
+        manifest: UploadFile = File(...),
+        sheets_zip: UploadFile = File(...),
+        settings: Settings = Depends(get_settings),
+        config: MarkingConfiguration = Depends(require_configuration),
+    ):
+        """Process batch uploads and return a ZIP archive with per-student results (robust, partial success)."""
+        from web.services.marker import SubjectResult
+        import dataclasses
+        empty_ar = SubjectResult(subject_name="AR", score=0, total_questions=0, results=[], marked_image=None, omr_response={})
+        _validate_extension(manifest, {".json"})
+        _validate_extension(sheets_zip, {".zip"})
 
-    manifest_errors = _validate_manifest(manifest_json)
-    if manifest_errors:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="; ".join(manifest_errors),
-        )
+        manifest_data = (await manifest.read()).decode("utf-8", errors="ignore")
+        try:
+            manifest_json = json.loads(manifest_data)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Manifest file must contain valid JSON.",
+            ) from exc
 
-    sheets_bytes = await sheets_zip.read()
-    size_limit = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
-    if len(sheets_bytes) > size_limit:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded ZIP exceeds the allowed size for batch processing.",
-        )
+        manifest_errors = _validate_manifest(manifest_json)
+        if manifest_errors:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="; ".join(manifest_errors),
+            )
 
+        sheets_bytes = await sheets_zip.read()
+        size_limit = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        if len(sheets_bytes) > size_limit:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded ZIP exceeds the allowed size for batch processing.",
+            )
 
-    import dataclasses
-    marking_service = MarkingService(settings.CONFIG_DIR)
-    analysis_service = AnalysisService(config.concept_mapping)
-    report_service = ReportService()
-    annotator_service = AnnotatorService()
+        marking_service = MarkingService(settings.CONFIG_DIR)
+        analysis_service = AnalysisService(config.concept_mapping)
+        report_service = ReportService()
+        annotator_service = AnnotatorService()
 
-    output_buffer = io.BytesIO()
-    try:
-        sheets_io = io.BytesIO(sheets_bytes)
-        with ZipFile(sheets_io) as sheets_archive_ctx, ZipFile(output_buffer, "w") as results_zip:
-            for student in manifest_json["students"]:
-                student_name = student["name"]
-                writing_score = student["writing_score"]
-                reading_file = student["reading_file"]
-                qrar_file = student["qrar_file"]
-
-                try:
-                    reading_bytes = sheets_archive_ctx.read(reading_file)
-                    qrar_bytes = sheets_archive_ctx.read(qrar_file)
-                except KeyError as exc:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Missing file '{exc.args[0]}' in sheets ZIP.",
-                    ) from exc
-
-                # Marking
-                # Convert answer keys to dicts (label: answer)
-                reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
-                qrar_key = {str(i+1): ans for i, ans in enumerate(config.qrar_answers)}
-
+        def _process_batch_student(student, sheets_archive_ctx):
+            student_name = student["name"]
+            writing_score = student["writing_score"]
+            reading_file = student["reading_file"]
+            qrar_file = student["qrar_file"]
+            folder_name = _sanitize_name(student_name)
+            base_path = f"{folder_name}/"
+            # Convert answer keys to dicts (label: answer)
+            reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
+            qrar_key = {str(i+1): ans for i, ans in enumerate(config.qrar_answers)}
+            # Try to read files and process
+            try:
+                reading_bytes = sheets_archive_ctx.read(reading_file)
+                qrar_bytes = sheets_archive_ctx.read(qrar_file)
                 reading_result = marking_service.process_single_subject(
                     subject_name="Reading",
                     image_bytes=reading_bytes,
@@ -165,39 +157,80 @@ async def process_batch(
                     answer_key=qrar_key,
                     template_filename="config/aset_qrar_template.json",
                 )
-
                 # Analysis
                 full_analysis = analysis_service.generate_full_analysis(
                     reading_result,
                     qrar_result,
                     empty_ar,
                 )
-
                 # Artifact Generation
-
                 report_pdf = report_service.generate_student_report(full_analysis)
                 reading_img = annotator_service.annotate_sheet(reading_result)
                 qrar_img = annotator_service.annotate_sheet(qrar_result)
                 reading_pdf = annotator_service.image_to_pdf_bytes(reading_img)
                 qrar_pdf = annotator_service.image_to_pdf_bytes(qrar_img)
-
                 # JSON results
                 results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
+                return {
+                    "status": "Success",
+                    "student_name": student_name,
+                    "writing_score": writing_score,
+                    "reading_score": getattr(reading_result, 'score', ''),
+                    "qr_score": getattr(qrar_result, 'score', ''),
+                    "ar_score": '',
+                    "notes": '',
+                    "artifacts": [
+                        (base_path + "Report.pdf", report_pdf),
+                        (base_path + "Reading_Marked.pdf", reading_pdf),
+                        (base_path + "QRAR_Marked.pdf", qrar_pdf),
+                        (base_path + "results.json", results_json),
+                    ]
+                }
+            except Exception as e:
+                return {
+                    "status": "Error",
+                    "student_name": student_name,
+                    "writing_score": writing_score,
+                    "reading_score": '',
+                    "qr_score": '',
+                    "ar_score": '',
+                    "notes": str(e),
+                    "artifacts": []
+                }
 
-                folder_name = _sanitize_name(student_name)
-                base_path = f"{folder_name}/"
-                results_zip.writestr(base_path + "Report.pdf", report_pdf)
-                results_zip.writestr(base_path + "Reading_Marked.pdf", reading_pdf)
-                results_zip.writestr(base_path + "QRAR_Marked.pdf", qrar_pdf)
-                results_zip.writestr(base_path + "results.json", results_json)
+        output_buffer = io.BytesIO()
+        summary_rows = []
+        try:
+            sheets_io = io.BytesIO(sheets_bytes)
+            with ZipFile(sheets_io) as sheets_archive_ctx, ZipFile(output_buffer, "w") as results_zip:
+                for student in manifest_json["students"]:
+                    result = _process_batch_student(student, sheets_archive_ctx)
+                    # Write artifacts if success
+                    for fname, data in result["artifacts"]:
+                        results_zip.writestr(fname, data)
+                    # Prepare summary row
+                    summary_rows.append([
+                        result["student_name"],
+                        result["status"],
+                        result["writing_score"],
+                        result["reading_score"],
+                        result["qr_score"],
+                        result["ar_score"],
+                        result["notes"]
+                    ])
+                # Write batch_summary.csv
+                csv_buffer = io.StringIO()
+                writer = csv.writer(csv_buffer)
+                writer.writerow(["Student Name", "Status", "Writing Score", "Reading Score", "QR Score", "AR Score", "Notes"])
+                writer.writerows(summary_rows)
+                results_zip.writestr("batch_summary.csv", csv_buffer.getvalue())
+        except BadZipFile as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Sheets upload must be a valid ZIP archive.",
+            ) from exc
 
-    except BadZipFile as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Sheets upload must be a valid ZIP archive.",
-        ) from exc
-
-    output_buffer.seek(0)
-    filename = "batch_results.zip"
-    headers = {"Content-Disposition": f"attachment; filename={filename}"}
-    return StreamingResponse(output_buffer, media_type="application/zip", headers=headers)
+        output_buffer.seek(0)
+        filename = "batch_results.zip"
+        headers = {"Content-Disposition": f"attachment; filename={filename}"}
+        return StreamingResponse(output_buffer, media_type="application/zip", headers=headers)
