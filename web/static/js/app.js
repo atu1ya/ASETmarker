@@ -87,8 +87,12 @@ class FileInputHandler {
         this.wrapper.addEventListener('drop', (e) => {
             const files = e.dataTransfer.files;
             if (files.length > 0) {
-                // Create a new FileList-like object and assign to input
-                this.input.files = files;
+                // Use DataTransfer to properly assign files to input
+                const dataTransfer = new DataTransfer();
+                for (let i = 0; i < files.length; i++) {
+                    dataTransfer.items.add(files[i]);
+                }
+                this.input.files = dataTransfer.files;
                 // Trigger change event manually
                 const event = new Event('change', { bubbles: true });
                 this.input.dispatchEvent(event);
