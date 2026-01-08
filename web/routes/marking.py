@@ -67,81 +67,109 @@ async def single_marking_page(
 async def process_single_student(
     request: Request,
     student_name: str = Form(...),
-    writing_score: int = Form(..., ge=0, le=100),
-    reading_sheet: UploadFile = File(...),
-    qrar_sheet: UploadFile = File(...),
+    writing_score: int = Form(0, ge=0, le=100),
+    reading_sheet: UploadFile = File(None),
+    qrar_sheet: UploadFile = File(None),
+    generate_report: bool = Form(False),
     settings: Settings = Depends(get_settings),
     config: MarkingConfiguration = Depends(require_configuration),
 ):
     """Process single student uploads and return a ZIP archive of results."""
     from web.services.marker import SubjectResult
+    
+    # Check that at least one file is provided
+    if not reading_sheet and not qrar_sheet:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one sheet (Reading or QR/AR) must be uploaded.",
+        )
+    
     empty_ar = SubjectResult(subject_name="AR", score=0, total_questions=0, results=[], marked_image=None, omr_response={})
 
     # Validate file types
     allowed = {ext.lower() for ext in settings.ALLOWED_EXTENSIONS}
-    _validate_upload(reading_sheet, allowed)
-    _validate_upload(qrar_sheet, allowed)
+    if reading_sheet and reading_sheet.filename:
+        _validate_upload(reading_sheet, allowed)
+    if qrar_sheet and qrar_sheet.filename:
+        _validate_upload(qrar_sheet, allowed)
 
     # Read files into memory
-    reading_bytes = await reading_sheet.read()
-    qrar_bytes = await qrar_sheet.read()
     size_limit = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
-    if len(reading_bytes) > size_limit or len(qrar_bytes) > size_limit:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded files exceed the maximum allowed size.",
-        )
+    reading_bytes = None
+    qrar_bytes = None
+    
+    if reading_sheet and reading_sheet.filename:
+        reading_bytes = await reading_sheet.read()
+        if len(reading_bytes) > size_limit:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reading sheet exceeds the maximum allowed size.",
+            )
+    
+    if qrar_sheet and qrar_sheet.filename:
+        qrar_bytes = await qrar_sheet.read()
+        if len(qrar_bytes) > size_limit:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="QR/AR sheet exceeds the maximum allowed size.",
+            )
 
     # Marking
-
     marking_service = MarkingService(settings.CONFIG_DIR)
-    # Convert answer keys to dicts (label: answer)
-    reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
-    qrar_key = {str(i+1): ans for i, ans in enumerate(config.qrar_answers)}
-
-    reading_result = marking_service.process_single_subject(
-        subject_name="Reading",
-        image_bytes=reading_bytes,
-        answer_key=reading_key,
-        template_filename="config/aset_reading_template.json",
-    )
-    qrar_result = marking_service.process_single_subject(
-        subject_name="QR/AR",
-        image_bytes=qrar_bytes,
-        answer_key=qrar_key,
-        template_filename="config/aset_qrar_template.json",
-    )
-
-    # Analysis
-    analysis_service = AnalysisService(config.concept_mapping)
-    full_analysis = analysis_service.generate_full_analysis(
-        reading_result,
-        qrar_result,
-        empty_ar,
-    )
+    reading_result = None
+    qrar_result = None
+    
+    if reading_bytes:
+        reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
+        reading_result = marking_service.process_single_subject(
+            subject_name="Reading",
+            image_bytes=reading_bytes,
+            answer_key=reading_key,
+            template_filename="config/aset_reading_template.json",
+        )
+    
+    if qrar_bytes:
+        qrar_key = {str(i+1): ans for i, ans in enumerate(config.qrar_answers)}
+        qrar_result = marking_service.process_single_subject(
+            subject_name="QR/AR",
+            image_bytes=qrar_bytes,
+            answer_key=qrar_key,
+            template_filename="config/aset_qrar_template.json",
+        )
 
     # Artifact Generation
-
-    report_service = ReportService()
     annotator_service = AnnotatorService()
-    report_pdf = report_service.generate_student_report(full_analysis)
-    reading_img = annotator_service.annotate_sheet(reading_result)
-    qrar_img = annotator_service.annotate_sheet(qrar_result)
-    reading_pdf = annotator_service.image_to_pdf_bytes(reading_img)
-    qrar_pdf = annotator_service.image_to_pdf_bytes(qrar_img)
-
-    # JSON results
-    import dataclasses
-    results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
-
-    # ZIP Packaging
     folder_name = _sanitize_name(student_name)
     zip_buffer = io.BytesIO()
+    
     with ZipFile(zip_buffer, "w") as bundle:
-        bundle.writestr(f"{folder_name}_Report.pdf", report_pdf)
-        bundle.writestr(f"{folder_name}_Reading_Marked.pdf", reading_pdf)
-        bundle.writestr(f"{folder_name}_QRAR_Marked.pdf", qrar_pdf)
-        bundle.writestr(f"{folder_name}_results.json", results_json)
+        # Add marked sheets for files that were processed
+        if reading_result:
+            reading_img = annotator_service.annotate_sheet(reading_result)
+            reading_pdf = annotator_service.image_to_pdf_bytes(reading_img)
+            bundle.writestr(f"{folder_name}_Reading_Marked.pdf", reading_pdf)
+        
+        if qrar_result:
+            qrar_img = annotator_service.annotate_sheet(qrar_result)
+            qrar_pdf = annotator_service.image_to_pdf_bytes(qrar_img)
+            bundle.writestr(f"{folder_name}_QRAR_Marked.pdf", qrar_pdf)
+        
+        # Generate report and analysis only if requested and both files provided
+        if generate_report and reading_result and qrar_result:
+            analysis_service = AnalysisService(config.concept_mapping)
+            full_analysis = analysis_service.generate_full_analysis(
+                reading_result,
+                qrar_result,
+                empty_ar,
+            )
+            report_service = ReportService()
+            report_pdf = report_service.generate_student_report(full_analysis, student_name)
+            bundle.writestr(f"{folder_name}_Report.pdf", report_pdf)
+            
+            # JSON results
+            import dataclasses
+            results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
+            bundle.writestr(f"{folder_name}_results.json", results_json)
 
     zip_buffer.seek(0)
     filename = f"{folder_name}_results.zip"
