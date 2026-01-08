@@ -151,13 +151,13 @@ async def process_batch(
                     subject_name="Reading",
                     image_bytes=reading_bytes,
                     answer_key=reading_key,
-                    template_filename="config/aset_reading_template.json",
+                    template_filename="aset_reading_template.json",
                 )
                 qrar_result = marking_service.process_single_subject(
                     subject_name="QR/AR",
                     image_bytes=qrar_bytes,
                     answer_key=qrar_key,
-                    template_filename="config/aset_qrar_template.json",
+                    template_filename="aset_qrar_template.json",
                 )
                 # Analysis
                 full_analysis = analysis_service.generate_full_analysis(

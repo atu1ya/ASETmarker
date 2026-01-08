@@ -58,6 +58,42 @@ class FileInputHandler {
         if (this.input) {
             this.input.addEventListener('change', (event) => this.handleChange(event));
         }
+
+        if (this.wrapper) {
+            this.setupDragAndDrop();
+        }
+    }
+
+    setupDragAndDrop() {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            this.wrapper.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            this.wrapper.addEventListener(eventName, () => {
+                this.wrapper.classList.add('drag-over');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            this.wrapper.addEventListener(eventName, () => {
+                this.wrapper.classList.remove('drag-over');
+            });
+        });
+
+        this.wrapper.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                // Create a new FileList-like object and assign to input
+                this.input.files = files;
+                // Trigger change event manually
+                const event = new Event('change', { bubbles: true });
+                this.input.dispatchEvent(event);
+            }
+        });
     }
 
     handleChange(event) {

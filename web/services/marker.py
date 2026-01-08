@@ -115,30 +115,20 @@ class MarkingService:
         template_filename: str,
         subject_name: str = "OMR"
     ) -> SubjectResult:
-        try:
-            self._validate_png(image_bytes)
-            image = self._bytes_to_cv_image(image_bytes)
-            template = self._load_template(template_filename)
-            omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
-            clean_response = get_concatenated_response(omr_response, template)
-            results, correct = self._evaluate_responses(clean_response, answer_key)
-            return SubjectResult(
-                subject_name=subject_name,
-                score=correct,
-                total_questions=len(answer_key),
-                results=results,
-                omr_response=clean_response,
-                marked_image=final_marked
-            )
-        except Exception as e:
-            return SubjectResult(
-                subject_name=subject_name,
-                score=0,
-                total_questions=len(answer_key),
-                results=[],
-                omr_response={},
-                marked_image=None
-            )
+        self._validate_png(image_bytes)
+        image = self._bytes_to_cv_image(image_bytes)
+        template = self._load_template(template_filename)
+        omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
+        clean_response = get_concatenated_response(omr_response, template)
+        results, correct = self._evaluate_responses(clean_response, answer_key)
+        return SubjectResult(
+            subject_name=subject_name,
+            score=correct,
+            total_questions=len(answer_key),
+            results=results,
+            omr_response=clean_response,
+            marked_image=final_marked
+        )
 
 
     def mark_reading_sheet(self, image_bytes: bytes, answer_key: List[str], template_filename: str = "reading_template.json") -> MarkingResult:

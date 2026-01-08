@@ -409,6 +409,12 @@ strong {
     background: rgba(52, 152, 219, 0.05);
 }
 
+.file-input-wrapper.drag-over {
+    border-color: var(--primary);
+    background: rgba(52, 152, 219, 0.1);
+    border-style: solid;
+}
+
 .file-input-wrapper input[type="file"] {
     position: absolute;
     top: 0;

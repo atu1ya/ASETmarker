@@ -120,24 +120,30 @@ async def process_single_student(
     reading_result = None
     qrar_result = None
     
-    if reading_bytes:
-        reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
-        reading_result = marking_service.process_single_subject(
-            subject_name="Reading",
-            image_bytes=reading_bytes,
-            answer_key=reading_key,
-            template_filename="config/aset_reading_template.json",
-        )
-    
-    if qrar_bytes:
-        # Combine QR and AR answers for the combined sheet
-        combined_answers = config.qr_answers + config.ar_answers
-        qrar_key = {str(i+1): ans for i, ans in enumerate(combined_answers)}
-        qrar_result = marking_service.process_single_subject(
-            subject_name="QR/AR",
-            image_bytes=qrar_bytes,
-            answer_key=qrar_key,
-            template_filename="config/aset_qrar_template.json",
+    try:
+        if reading_bytes:
+            reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
+            reading_result = marking_service.process_single_subject(
+                subject_name="Reading",
+                image_bytes=reading_bytes,
+                answer_key=reading_key,
+                template_filename="aset_reading_template.json",
+            )
+        
+        if qrar_bytes:
+            # Combine QR and AR answers for the combined sheet
+            combined_answers = config.qr_answers + config.ar_answers
+            qrar_key = {str(i+1): ans for i, ans in enumerate(combined_answers)}
+            qrar_result = marking_service.process_single_subject(
+                subject_name="QR/AR",
+                image_bytes=qrar_bytes,
+                answer_key=qrar_key,
+                template_filename="aset_qrar_template.json",
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Marking failed: {str(e)}",
         )
 
     # Artifact Generation
