@@ -4,12 +4,14 @@
 
   "preProcessors": [
     {
-      "name": "FeatureBasedAlignment",
+      "name": "CropOnMarkers",
       "options": {
-        "reference": "reference_reading.jpg",
-        "maxFeatures": 1000,
-        "goodMatchPercent": 0.15,
-        "2d": true
+        "relativePath": "omr_marker.jpg",
+        "min_matching_threshold": 0.3,
+        "max_matching_variation": 0.5,
+        "marker_rescale_range": [30, 100],
+        "marker_rescale_steps": 10,
+        "apply_erode_subtract": true
       }
     }
   ],

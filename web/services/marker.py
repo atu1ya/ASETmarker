@@ -40,10 +40,12 @@ from src.template import Template
 from src.core import ImageInstanceOps
 from src.utils.parsing import get_concatenated_response
 from src.processors.FeatureBasedAlignment import FeatureBasedAlignment
+from src.processors.CropOnMarkers import CropOnMarkers
 
-# Register FeatureBasedAlignment (required for templates)
+# Register preprocessors (required for templates)
 from src.processors import manager as processor_manager
 processor_manager.PROCESSOR_MANAGER.processors["FeatureBasedAlignment"] = FeatureBasedAlignment
+processor_manager.PROCESSOR_MANAGER.processors["CropOnMarkers"] = CropOnMarkers
 
 @dataclass
 class QuestionResult:
@@ -99,7 +101,10 @@ class MarkingService:
         correct = 0
         for label, correct_value in answer_key.items():
             marked_value = clean_response.get(label, "")
-            is_correct = (marked_value == correct_value)
+            # Normalize both values for comparison (case-insensitive, trimmed)
+            marked_normalized = str(marked_value).strip().upper()
+            correct_normalized = str(correct_value).strip().upper()
+            is_correct = (marked_normalized == correct_normalized)
             if is_correct:
                 correct += 1
             results.append(QuestionResult(
