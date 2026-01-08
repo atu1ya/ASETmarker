@@ -1,6 +1,7 @@
-import csv
 """Batch processing routes."""
 from __future__ import annotations
+
+import csv
 
 import io
 import json
@@ -88,13 +89,11 @@ async def batch_page(request: Request, config: MarkingConfiguration = Depends(re
 
 @router.post("/process")
 async def process_batch(
-
-    async def process_batch(
-        manifest: UploadFile = File(...),
-        sheets_zip: UploadFile = File(...),
-        settings: Settings = Depends(get_settings),
-        config: MarkingConfiguration = Depends(require_configuration),
-    ):
+    manifest: UploadFile = File(...),
+    sheets_zip: UploadFile = File(...),
+    settings: Settings = Depends(get_settings),
+    config: MarkingConfiguration = Depends(require_configuration),
+):
         """Process batch uploads and return a ZIP archive with per-student results (robust, partial success)."""
         from web.services.marker import SubjectResult
         import dataclasses

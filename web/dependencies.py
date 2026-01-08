@@ -14,9 +14,9 @@ def get_settings() -> Settings:
 def get_current_session(request: Request) -> str:
     """Ensure the request originates from an authenticated session."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
-    if not validate_session(token):
+    if not token or not validate_session(token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
-    return token  # token is guaranteed to be non-empty when valid
+    return token
 
 
 def get_optional_session(request: Request) -> str | None:

@@ -12,3 +12,4 @@ pydantic-settings>=2.2.1
 python-multipart>=0.0.9
 Jinja2>=3.1.4
 reportlab>=4.0.6
+itsdangerous>=2.0.1
