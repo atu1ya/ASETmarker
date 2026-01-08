@@ -205,7 +205,8 @@ function updateConfigStatus(summary) {
             <strong>Configuration Loaded</strong>
             <div class="text-muted">
                 Reading: ${summary.reading_questions} questions ·
-                QR/AR: ${summary.qrar_questions} questions ·
+                QR: ${summary.qr_questions} questions ·
+                AR: ${summary.ar_questions} questions ·
                 Subjects: ${subjects}
             </div>
         </div>
