@@ -15,7 +15,8 @@
         <strong>Configuration Loaded</strong>
         <div class="text-muted">
             Reading: {{ config_status.reading_questions }} questions &middot;
-            QR/AR: {{ config_status.qrar_questions }} questions &middot;
+            QR: {{ config_status.qr_questions }} questions &middot;
+            AR: {{ config_status.ar_questions }} questions &middot;
             Subjects: {{ config_status.subjects_mapped | join(', ') }}
         </div>
     </div>
@@ -43,11 +44,19 @@
             </div>
         </div>
         <div class="form-group">
-            <label class="form-label" for="qrar_answers">QR/AR Answer Key (.txt or .csv)</label>
+            <label class="form-label" for="qr_answers">Quantitative Reasoning (QR) Answer Key (.txt or .csv)</label>
             <div class="file-input-wrapper">
                 <span class="file-icon">&#128462;</span>
                 <span class="file-text">Click to upload or drop file here</span>
-                <input type="file" id="qrar_answers" name="qrar_answers" accept=".txt,.csv" required>
+                <input type="file" id="qr_answers" name="qr_answers" accept=".txt,.csv" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="ar_answers">Abstract Reasoning (AR) Answer Key (.txt or .csv)</label>
+            <div class="file-input-wrapper">
+                <span class="file-icon">&#128462;</span>
+                <span class="file-text">Click to upload or drop file here</span>
+                <input type="file" id="ar_answers" name="ar_answers" accept=".txt,.csv" required>
             </div>
         </div>
         <div class="form-group">

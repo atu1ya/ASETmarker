@@ -87,7 +87,8 @@ def get_configuration_status(session_token: str) -> dict:
         return {
             "configured": False,
             "reading_questions": 0,
-            "qrar_questions": 0,
+            "qr_questions": 0,
+            "ar_questions": 0,
             "subjects_mapped": [],
             "uploaded_at": None,
         }
@@ -95,7 +96,8 @@ def get_configuration_status(session_token: str) -> dict:
     return {
         "configured": True,
         "reading_questions": len(config.reading_answers),
-        "qrar_questions": len(config.qrar_answers),
+        "qr_questions": len(config.qr_answers),
+        "ar_questions": len(config.ar_answers),
         "subjects_mapped": [
             subject for subject in config.concept_mapping.keys() if not subject.startswith("_")
         ],
@@ -127,7 +129,8 @@ async def dashboard_alias():
 async def configure_marking(
     session_token: str = Depends(get_current_session),
     reading_answers: UploadFile = File(...),
-    qrar_answers: UploadFile = File(...),
+    qr_answers: UploadFile = File(...),
+    ar_answers: UploadFile = File(...),
     concept_mapping: UploadFile = File(...),
 ):
     """Upload and store marking configuration for the current session."""
@@ -140,17 +143,20 @@ async def configure_marking(
             )
 
     _validate_extension(reading_answers, ALLOWED_TEXT_EXTENSIONS)
-    _validate_extension(qrar_answers, ALLOWED_TEXT_EXTENSIONS)
+    _validate_extension(qr_answers, ALLOWED_TEXT_EXTENSIONS)
+    _validate_extension(ar_answers, ALLOWED_TEXT_EXTENSIONS)
     _validate_extension(concept_mapping, {".json"})
 
     reading_content = (await reading_answers.read()).decode("utf-8", errors="ignore")
-    qrar_content = (await qrar_answers.read()).decode("utf-8", errors="ignore")
+    qr_content = (await qr_answers.read()).decode("utf-8", errors="ignore")
+    ar_content = (await ar_answers.read()).decode("utf-8", errors="ignore")
     concept_content = (await concept_mapping.read()).decode("utf-8", errors="ignore")
 
     reading_list = parse_answer_key(reading_content)
-    qrar_list = parse_answer_key(qrar_content)
+    qr_list = parse_answer_key(qr_content)
+    ar_list = parse_answer_key(ar_content)
 
-    if not reading_list or not qrar_list:
+    if not reading_list or not qr_list or not ar_list:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Answer keys must contain at least one entry.",
@@ -173,7 +179,8 @@ async def configure_marking(
 
     config = MarkingConfiguration(
         reading_answers=reading_list,
-        qrar_answers=qrar_list,
+        qr_answers=qr_list,
+        ar_answers=ar_list,
         concept_mapping=concepts,
         uploaded_at=datetime.utcnow(),
     )

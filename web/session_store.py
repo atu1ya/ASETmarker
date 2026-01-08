@@ -14,13 +14,14 @@ class MarkingConfiguration:
     """Stores uploaded marking configuration for a session."""
 
     reading_answers: list[str] = field(default_factory=list)
-    qrar_answers: list[str] = field(default_factory=list)
+    qr_answers: list[str] = field(default_factory=list)
+    ar_answers: list[str] = field(default_factory=list)
     concept_mapping: dict = field(default_factory=dict)
     uploaded_at: datetime = field(default_factory=datetime.now)
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.reading_answers and self.qrar_answers and self.concept_mapping)
+        return bool(self.reading_answers and self.qr_answers and self.ar_answers and self.concept_mapping)
 
 
 class SessionConfigStore:
