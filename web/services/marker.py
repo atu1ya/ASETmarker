@@ -41,11 +41,13 @@ from src.core import ImageInstanceOps
 from src.utils.parsing import get_concatenated_response
 from src.processors.FeatureBasedAlignment import FeatureBasedAlignment
 from src.processors.CropOnMarkers import CropOnMarkers
+from src.processors.CropPage import CropPage
 
 # Register preprocessors (required for templates)
 from src.processors import manager as processor_manager
 processor_manager.PROCESSOR_MANAGER.processors["FeatureBasedAlignment"] = FeatureBasedAlignment
 processor_manager.PROCESSOR_MANAGER.processors["CropOnMarkers"] = CropOnMarkers
+processor_manager.PROCESSOR_MANAGER.processors["CropPage"] = CropPage
 
 @dataclass
 class QuestionResult:
