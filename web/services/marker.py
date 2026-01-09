@@ -67,6 +67,7 @@ class SubjectResult:
     omr_response: Dict[str, str]
     marked_image: Any = field(repr=False)
     template: Any = field(repr=False, default=None)  # Template object for annotation
+    clean_image: Optional[np.ndarray] = field(repr=False, default=None)  # Clean aligned image for feedback
 
 class MarkingService:
     def __init__(self, config_dir: Path):
@@ -197,7 +198,8 @@ class MarkingService:
             results=results,
             omr_response=clean_response,
             marked_image=clean_img,  # Use clean image instead of final_marked
-            template=template  # Pass template for annotation
+            template=template,  # Pass template for annotation
+            clean_image=clean_img  # Pass clean aligned image for annotation
         )
 
 

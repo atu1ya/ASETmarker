@@ -81,10 +81,13 @@ class AnnotatorService:
         
         Returns the annotated image as np.ndarray.
         """
-        if result.marked_image is None:
-            raise ValueError("No marked image found in result.")
-        
-        img = result.marked_image.copy()
+        # Use clean_image if available (SubjectResult), otherwise fall back to marked_image
+        if hasattr(result, 'clean_image') and result.clean_image is not None:
+            img = result.clean_image.copy()
+        elif result.marked_image is not None:
+            img = result.marked_image.copy()
+        else:
+            raise ValueError("No image found in result.")
         
         # Step A: Convert to BGR immediately for color annotation
         if len(img.shape) == 2:
@@ -99,6 +102,9 @@ class AnnotatorService:
         
         questions = self._get_questions(result)
         
+        print(f"[ANNOTATOR DEBUG] Starting annotation for {len(questions)} questions")
+        print(f"[ANNOTATOR DEBUG] Image shape: {img.shape}, Template: {template.path.name if template else 'None'}")
+        
         # Step C: Draw feedback for incorrect answers
         for question in questions:
             if question.is_correct:
@@ -109,6 +115,8 @@ class AnnotatorService:
             label_key = str(question.label).lower()
             value_key = str(question.correct_value).upper()
             lookup_key = (label_key, value_key)
+            
+            print(f"[ANNOTATOR DEBUG] Processing incorrect question: {question.label}, correct={question.correct_value}, lookup_key={lookup_key}")
             
             # Retrieve bubble and field_block from index
             bubble_data = bubble_index.get(lookup_key)
@@ -121,6 +129,8 @@ class AnnotatorService:
                 y = bubble.y
                 box_w, box_h = field_block.bubble_dimensions
                 
+                print(f"[ANNOTATOR DEBUG] Drawing red rectangle at x={x}, y={y}, w={box_w}, h={box_h}, shift={field_block.shift}")
+                
                 # Draw red rectangle around the correct answer
                 # Using a thick border (thickness=3) for visibility
                 cv2.rectangle(
@@ -130,6 +140,8 @@ class AnnotatorService:
                     CLR_RED,
                     3
                 )
+            else:
+                print(f"[ANNOTATOR DEBUG] WARNING: No bubble data found for {lookup_key}")
         
         # Add score overlay
         img = self._add_score_overlay(img, result)

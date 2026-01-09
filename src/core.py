@@ -54,6 +54,11 @@ class ImageInstanceOps:
             )
             if img.max() > img.min():
                 img = ImageUtils.normalize_util(img)
+            
+            # Capture clean aligned image immediately after resize and normalization
+            # This is the correctly sized image before any debug rectangles are drawn
+            clean_aligned_image = img.copy()
+            
             # Processing copies
             transp_layer = img.copy()
             final_marked = img.copy()
@@ -209,10 +214,6 @@ class ImageInstanceOps:
                 if auto_align:
                     final_align = np.hstack((initial_align, final_align))
             self.append_save_img(5, img)
-
-            # Capture clean processed image AFTER alignment shifts are calculated
-            # but BEFORE any detection rectangles are drawn
-            clean_processed_img = img.copy()
 
             # Get mean bubbleValues n other stats
             all_q_vals, all_q_strip_arrs, all_q_std_vals = [], [], []
@@ -431,7 +432,7 @@ class ImageInstanceOps:
                 for i in range(config.outputs.save_image_level):
                     self.save_image_stacks(i + 1, name, save_dir)
 
-            return omr_response, final_marked, multi_marked, multi_roll, clean_processed_img
+            return omr_response, final_marked, multi_marked, multi_roll, clean_aligned_image
 
         except Exception as e:
             raise e
