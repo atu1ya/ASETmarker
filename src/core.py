@@ -329,7 +329,7 @@ class ImageInstanceOps:
                                 (x, y),
                                 cv2.FONT_HERSHEY_SIMPLEX,
                                 TEXT_SIZE,
-                                (0, 0, 255),
+                                (20, 20, 10),
                                 int(1 + 3.5 * TEXT_SIZE),
                             )
                         else:

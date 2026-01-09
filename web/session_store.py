@@ -21,7 +21,7 @@ class MarkingConfiguration:
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.reading_answers and self.qr_answers and self.ar_answers)
+        return bool(self.reading_answers or self.qr_answers or self.ar_answers)
     
     @property
     def has_concept_mapping(self) -> bool:

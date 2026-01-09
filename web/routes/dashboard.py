@@ -129,9 +129,9 @@ async def dashboard_alias():
 @router.post("/configure")
 async def configure_marking(
     session_token: str = Depends(get_current_session),
-    reading_answers: UploadFile = File(...),
-    qr_answers: UploadFile = File(...),
-    ar_answers: UploadFile = File(...),
+    reading_answers: UploadFile = File(None),
+    qr_answers: UploadFile = File(None),
+    ar_answers: UploadFile = File(None),
     concept_mapping: UploadFile = File(None),
 ):
     """Upload and store marking configuration for the current session."""
@@ -143,22 +143,44 @@ async def configure_marking(
                 detail=f"Unsupported file type for {upload.filename}",
             )
 
-    _validate_extension(reading_answers, ALLOWED_TEXT_EXTENSIONS)
-    _validate_extension(qr_answers, ALLOWED_TEXT_EXTENSIONS)
-    _validate_extension(ar_answers, ALLOWED_TEXT_EXTENSIONS)
+    reading_list = []
+    qr_list = []
+    ar_list = []
 
-    reading_content = (await reading_answers.read()).decode("utf-8", errors="ignore")
-    qr_content = (await qr_answers.read()).decode("utf-8", errors="ignore")
-    ar_content = (await ar_answers.read()).decode("utf-8", errors="ignore")
+    if reading_answers and reading_answers.filename:
+        _validate_extension(reading_answers, ALLOWED_TEXT_EXTENSIONS)
+        reading_content = (await reading_answers.read()).decode("utf-8", errors="ignore")
+        reading_list = parse_answer_key(reading_content)
+        if not reading_list:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reading answer key must contain at least one entry.",
+            )
 
-    reading_list = parse_answer_key(reading_content)
-    qr_list = parse_answer_key(qr_content)
-    ar_list = parse_answer_key(ar_content)
+    if qr_answers and qr_answers.filename:
+        _validate_extension(qr_answers, ALLOWED_TEXT_EXTENSIONS)
+        qr_content = (await qr_answers.read()).decode("utf-8", errors="ignore")
+        qr_list = parse_answer_key(qr_content)
+        if not qr_list:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="QR answer key must contain at least one entry.",
+            )
 
-    if not reading_list or not qr_list or not ar_list:
+    if ar_answers and ar_answers.filename:
+        _validate_extension(ar_answers, ALLOWED_TEXT_EXTENSIONS)
+        ar_content = (await ar_answers.read()).decode("utf-8", errors="ignore")
+        ar_list = parse_answer_key(ar_content)
+        if not ar_list:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="AR answer key must contain at least one entry.",
+            )
+
+    if not reading_list and not qr_list and not ar_list:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Answer keys must contain at least one entry.",
+            detail="At least one answer key (Reading, QR, or AR) must be uploaded.",
         )
 
     concepts = {}

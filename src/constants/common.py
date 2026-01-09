@@ -47,7 +47,7 @@ TEXT_SIZE = 0.95
 CLR_BLACK = (50, 150, 150)
 CLR_WHITE = (250, 250, 250)
 CLR_GRAY = (130, 130, 130)
-CLR_DARK_GRAY = (0, 0, 200)  # Red color in BGR format for marked bubbles
+CLR_DARK_GRAY = (100, 100, 100)
 
 # TODO: move to config.json
 GLOBAL_PAGE_THRESHOLD_WHITE = 200
