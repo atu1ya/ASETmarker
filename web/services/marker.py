@@ -98,20 +98,77 @@ class MarkingService:
         )
         return omr_response, final_marked, multi_marked, multi_roll
 
+    def _normalize_marked_value(self, value: Any) -> str:
+        """
+        Normalize a marked value to a string for comparison.
+        Handles lists (e.g., ['A']), strings, and other types.
+        """
+        if value is None:
+            return ""
+        if isinstance(value, list):
+            if len(value) == 0:
+                return ""
+            elif len(value) == 1:
+                # Single selection - extract the value
+                return str(value[0]).strip().upper()
+            else:
+                # Multiple selections - join them (multi-marked)
+                return ",".join(str(v).strip().upper() for v in sorted(value))
+        return str(value).strip().upper()
+
+    def _lookup_response(self, clean_response: dict, label: str) -> Any:
+        """
+        Look up a response value, trying multiple key variations.
+        E.g., for label "RC1", try: "RC1", "rc1", "1", "q1"
+        """
+        # Try exact match first
+        if label in clean_response:
+            return clean_response[label]
+        
+        # Try case-insensitive match
+        label_lower = label.lower()
+        label_upper = label.upper()
+        for key in clean_response:
+            if key.lower() == label_lower or key.upper() == label_upper:
+                return clean_response[key]
+        
+        # Try extracting number and matching with different prefixes
+        import re
+        match = re.search(r'(\d+)$', label)
+        if match:
+            num = match.group(1)
+            # Try just the number
+            if num in clean_response:
+                return clean_response[num]
+            # Try common prefixes
+            for prefix in ['q', 'Q', 'rc', 'RC', 'qr', 'QR', 'ar', 'AR']:
+                alt_key = f"{prefix}{num}"
+                if alt_key in clean_response:
+                    return clean_response[alt_key]
+        
+        return ""
+
     def _evaluate_responses(self, clean_response: dict, answer_key: dict) -> Tuple[List[QuestionResult], int]:
         results: List[QuestionResult] = []
         correct = 0
         for label, correct_value in answer_key.items():
-            marked_value = clean_response.get(label, "")
-            # Normalize both values for comparison (case-insensitive, trimmed)
-            marked_normalized = str(marked_value).strip().upper()
+            raw_marked = self._lookup_response(clean_response, label)
+            marked_normalized = self._normalize_marked_value(raw_marked)
             correct_normalized = str(correct_value).strip().upper()
-            is_correct = (marked_normalized == correct_normalized)
+            
+            # Handle multi-marked case: if marked has multiple values, it's incorrect
+            is_multi = "," in marked_normalized
+            is_correct = (marked_normalized == correct_normalized) and not is_multi
+            
             if is_correct:
                 correct += 1
+            
+            # Store the normalized marked value for display
+            display_marked = marked_normalized if marked_normalized else "(blank)"
+            
             results.append(QuestionResult(
                 label=label,
-                marked_value=marked_value,
+                marked_value=display_marked,
                 correct_value=correct_value,
                 is_correct=is_correct
             ))
@@ -150,9 +207,9 @@ class MarkingService:
             template = self._load_template(template_filename)
             omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
             clean_response = get_concatenated_response(omr_response, template)
-            # Map answer_key to dict if needed
+            # Map answer_key to dict using RC prefix to match template fieldLabels
             if isinstance(answer_key, list):
-                answer_key_dict = {f"q{i+1}": v for i, v in enumerate(answer_key)}
+                answer_key_dict = {f"RC{i+1}": v for i, v in enumerate(answer_key)}
             else:
                 answer_key_dict = answer_key
             results, correct = self._evaluate_responses(clean_response, answer_key_dict)
@@ -193,12 +250,12 @@ class MarkingService:
             template = self._load_template(template_filename)
             omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
             clean_response = get_concatenated_response(omr_response, template)
-            # Split answer_key into QR and AR (first 25 QR, rest AR)
+            # Split answer_key into QR and AR (first 35 QR, rest AR) - using uppercase prefixes to match template
             num_questions = len(answer_key)
-            qr_count = min(25, num_questions)
+            qr_count = min(35, num_questions)
             ar_count = num_questions - qr_count
-            qr_key = {f"qr{i+1}": answer_key[i] for i in range(qr_count)}
-            ar_key = {f"ar{i+1}": answer_key[qr_count + i] for i in range(ar_count)}
+            qr_key = {f"QR{i+1}": answer_key[i] for i in range(qr_count)}
+            ar_key = {f"AR{i+1}": answer_key[qr_count + i] for i in range(ar_count)}
             qr_results, qr_correct = self._evaluate_responses(clean_response, qr_key)
             ar_results, ar_correct = self._evaluate_responses(clean_response, ar_key)
             qr_total = len(qr_key)
