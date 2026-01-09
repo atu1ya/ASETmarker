@@ -11,6 +11,16 @@
         "gamma": 1.0
       }
     },
+
+    {
+      "name": "FeatureBasedAlignment",
+      "options": {
+        "reference": "reference_reading.jpg",
+        "maxFeatures": 10000,
+        "goodMatchPercent": 0.04
+      }
+    },
+
     {
       "name": "GaussianBlur",
       "options": {

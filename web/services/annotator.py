@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from io import BytesIO
 from PIL import Image
-from typing import Any, Union, List
+from typing import Any, Union, List, Dict, Tuple
 from web.services.marker import SubjectResult, MarkingResult, QRARMarkingResult, QuestionResult
 
 
@@ -49,26 +49,29 @@ class AnnotatorService:
         
         return score, total
 
-    def _find_bubble_for_answer(self, template, field_label: str, correct_value: str):
+    def _build_bubble_index(self, template) -> Dict[Tuple[str, str], Tuple[Any, Any]]:
         """
-        Find the bubble coordinates for a given field_label and correct_value.
-        Returns (x, y, box_w, box_h, shift) or None if not found.
+        Build a fast lookup dictionary from template.
+        Key: (field_label_lower, field_value_upper)
+        Value: (bubble, field_block)
+        
+        This ensures case-insensitive lookup for both label and value.
         """
-        if template is None:
-            return None
+        bubble_index = {}
+        
+        if template is None or not hasattr(template, 'field_blocks'):
+            return bubble_index
         
         for field_block in template.field_blocks:
-            shift = field_block.shift
-            box_w, box_h = field_block.bubble_dimensions
-            
             for field_block_bubbles in field_block.traverse_bubbles:
                 for bubble in field_block_bubbles:
-                    # Match field_label and field_value (case-insensitive)
-                    if (bubble.field_label.upper() == field_label.upper() and 
-                        str(bubble.field_value).upper() == str(correct_value).upper()):
-                        return (bubble.x, bubble.y, box_w, box_h, shift)
+                    # Create case-normalized key
+                    label_key = str(bubble.field_label).lower()
+                    value_key = str(bubble.field_value).upper()
+                    key = (label_key, value_key)
+                    bubble_index[key] = (bubble, field_block)
         
-        return None
+        return bubble_index
 
     def annotate_sheet(self, result: Union[SubjectResult, MarkingResult]) -> np.ndarray:
         """
@@ -83,38 +86,47 @@ class AnnotatorService:
         
         img = result.marked_image.copy()
         
-        # Convert to BGR for color annotation
+        # Step A: Convert to BGR immediately for color annotation
         if len(img.shape) == 2:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        elif img.shape[2] == 1:
+        elif len(img.shape) == 3 and img.shape[2] == 1:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         
         template = getattr(result, 'template', None)
+        
+        # Step B: Build bubble index for fast lookup
+        bubble_index = self._build_bubble_index(template)
+        
         questions = self._get_questions(result)
         
-        # Iterate through question results
+        # Step C: Draw feedback for incorrect answers
         for question in questions:
             if question.is_correct:
                 # Correct answer: no annotation needed
                 continue
             
-            # Incorrect answer: highlight the correct option in red
-            bubble_info = self._find_bubble_for_answer(
-                template, 
-                question.label, 
-                question.correct_value
-            )
+            # Construct lookup key: (label_lower, value_upper)
+            label_key = str(question.label).lower()
+            value_key = str(question.correct_value).upper()
+            lookup_key = (label_key, value_key)
             
-            if bubble_info:
-                x, y, box_w, box_h, shift = bubble_info
-                # Apply shift from alignment
-                x_shifted = x + shift
+            # Retrieve bubble and field_block from index
+            bubble_data = bubble_index.get(lookup_key)
+            
+            if bubble_data:
+                bubble, field_block = bubble_data
                 
-                # Draw red rectangle around the correct answer bubble
+                # Calculate coordinates with alignment shift
+                x = bubble.x + field_block.shift
+                y = bubble.y
+                box_w, box_h = field_block.bubble_dimensions
+                
+                # Draw red rectangle around the correct answer
+                # Using a thick border (thickness=3) for visibility
                 cv2.rectangle(
                     img,
-                    (int(x_shifted + box_w / 12), int(y + box_h / 12)),
-                    (int(x_shifted + box_w - box_w / 12), int(y + box_h - box_h / 12)),
+                    (int(x + box_w / 12), int(y + box_h / 12)),
+                    (int(x + box_w - box_w / 12), int(y + box_h - box_h / 12)),
                     CLR_RED,
                     3
                 )
@@ -134,58 +146,69 @@ class AnnotatorService:
         
         img = result.marked_image.copy()
         
-        # Convert to BGR for color annotation
+        # Step A: Convert to BGR immediately for color annotation
         if len(img.shape) == 2:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        elif img.shape[2] == 1:
+        elif len(img.shape) == 3 and img.shape[2] == 1:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         
         template = getattr(result, 'template', None)
         
-        # Process QR questions
+        # Step B: Build bubble index for fast lookup
+        bubble_index = self._build_bubble_index(template)
+        
+        # Step C: Draw feedback for QR questions
         if result.qr:
             qr_questions = self._get_questions(result.qr)
             for question in qr_questions:
                 if question.is_correct:
                     continue
                 
-                bubble_info = self._find_bubble_for_answer(
-                    template,
-                    question.label,
-                    question.correct_value
-                )
+                # Construct lookup key
+                label_key = str(question.label).lower()
+                value_key = str(question.correct_value).upper()
+                lookup_key = (label_key, value_key)
                 
-                if bubble_info:
-                    x, y, box_w, box_h, shift = bubble_info
-                    x_shifted = x + shift
+                bubble_data = bubble_index.get(lookup_key)
+                
+                if bubble_data:
+                    bubble, field_block = bubble_data
+                    x = bubble.x + field_block.shift
+                    y = bubble.y
+                    box_w, box_h = field_block.bubble_dimensions
+                    
                     cv2.rectangle(
                         img,
-                        (int(x_shifted + box_w / 12), int(y + box_h / 12)),
-                        (int(x_shifted + box_w - box_w / 12), int(y + box_h - box_h / 12)),
+                        (int(x + box_w / 12), int(y + box_h / 12)),
+                        (int(x + box_w - box_w / 12), int(y + box_h - box_h / 12)),
                         CLR_RED,
                         3
                     )
         
-        # Process AR questions
+        # Step C: Draw feedback for AR questions
         if result.ar:
             ar_questions = self._get_questions(result.ar)
             for question in ar_questions:
                 if question.is_correct:
                     continue
                 
-                bubble_info = self._find_bubble_for_answer(
-                    template,
-                    question.label,
-                    question.correct_value
-                )
+                # Construct lookup key
+                label_key = str(question.label).lower()
+                value_key = str(question.correct_value).upper()
+                lookup_key = (label_key, value_key)
                 
-                if bubble_info:
-                    x, y, box_w, box_h, shift = bubble_info
-                    x_shifted = x + shift
+                bubble_data = bubble_index.get(lookup_key)
+                
+                if bubble_data:
+                    bubble, field_block = bubble_data
+                    x = bubble.x + field_block.shift
+                    y = bubble.y
+                    box_w, box_h = field_block.bubble_dimensions
+                    
                     cv2.rectangle(
                         img,
-                        (int(x_shifted + box_w / 12), int(y + box_h / 12)),
-                        (int(x_shifted + box_w - box_w / 12), int(y + box_h - box_h / 12)),
+                        (int(x + box_w / 12), int(y + box_h / 12)),
+                        (int(x + box_w - box_w / 12), int(y + box_h - box_h / 12)),
                         CLR_RED,
                         3
                     )
