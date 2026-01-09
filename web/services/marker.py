@@ -20,6 +20,7 @@ class MarkingResult:
     marked_image: Optional[np.ndarray] = field(repr=False, default=None)
     multi_marked: bool = False
     error: Optional[str] = None
+    template: Any = field(repr=False, default=None)  # Template object for annotation
 
 @dataclass
 class QRARMarkingResult:
@@ -29,6 +30,7 @@ class QRARMarkingResult:
     marked_image: Optional[np.ndarray] = field(repr=False, default=None)
     multi_marked: bool = False
     error: Optional[str] = None
+    template: Any = field(repr=False, default=None)  # Template object for annotation
 
 import cv2
 import numpy as np
@@ -64,6 +66,7 @@ class SubjectResult:
     results: List[QuestionResult]
     omr_response: Dict[str, str]
     marked_image: Any = field(repr=False)
+    template: Any = field(repr=False, default=None)  # Template object for annotation
 
 class MarkingService:
     def __init__(self, config_dir: Path):
@@ -90,13 +93,13 @@ class MarkingService:
             raise FileNotFoundError(f"Template file not found: {template_path}")
         return Template(template_path, self.tuning_config)
 
-    def _run_omr_pipeline(self, image: np.ndarray, template: Template) -> Tuple[dict, np.ndarray, bool, Any]:
+    def _run_omr_pipeline(self, image: np.ndarray, template: Template) -> Tuple[dict, np.ndarray, bool, Any, np.ndarray]:
         ops = ImageInstanceOps(self.tuning_config)
         processed_image = ops.apply_preprocessors("dummy_path", image, template)
-        omr_response, final_marked, multi_marked, multi_roll = ops.read_omr_response(
+        omr_response, final_marked, multi_marked, multi_roll, clean_img = ops.read_omr_response(
             template, processed_image, "dummy_name"
         )
-        return omr_response, final_marked, multi_marked, multi_roll
+        return omr_response, final_marked, multi_marked, multi_roll, clean_img
 
     def _normalize_marked_value(self, value: Any) -> str:
         """
@@ -184,7 +187,7 @@ class MarkingService:
         self._validate_image(image_bytes)
         image = self._bytes_to_cv_image(image_bytes)
         template = self._load_template(template_filename)
-        omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
+        omr_response, final_marked, multi_marked, _, clean_img = self._run_omr_pipeline(image, template)
         clean_response = get_concatenated_response(omr_response, template)
         results, correct = self._evaluate_responses(clean_response, answer_key)
         return SubjectResult(
@@ -193,7 +196,8 @@ class MarkingService:
             total_questions=len(answer_key),
             results=results,
             omr_response=clean_response,
-            marked_image=final_marked
+            marked_image=clean_img,  # Use clean image instead of final_marked
+            template=template  # Pass template for annotation
         )
 
 
@@ -205,7 +209,7 @@ class MarkingService:
             self._validate_image(image_bytes)
             image = self._bytes_to_cv_image(image_bytes)
             template = self._load_template(template_filename)
-            omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
+            omr_response, final_marked, multi_marked, _, clean_img = self._run_omr_pipeline(image, template)
             clean_response = get_concatenated_response(omr_response, template)
             # Map answer_key to dict using RC prefix to match template fieldLabels
             if isinstance(answer_key, list):
@@ -223,8 +227,9 @@ class MarkingService:
                 percentage=percentage,
                 questions=results,
                 responses=clean_response,
-                marked_image=final_marked,
-                multi_marked=multi_marked
+                marked_image=clean_img,  # Use clean image instead of final_marked
+                multi_marked=multi_marked,
+                template=template  # Pass template for annotation
             )
         except Exception as e:
             return MarkingResult(
@@ -248,7 +253,7 @@ class MarkingService:
             self._validate_image(image_bytes)
             image = self._bytes_to_cv_image(image_bytes)
             template = self._load_template(template_filename)
-            omr_response, final_marked, multi_marked, _ = self._run_omr_pipeline(image, template)
+            omr_response, final_marked, multi_marked, _, clean_img = self._run_omr_pipeline(image, template)
             clean_response = get_concatenated_response(omr_response, template)
             # Split answer_key into QR and AR (first 35 QR, rest AR) - using uppercase prefixes to match template
             num_questions = len(answer_key)
@@ -270,8 +275,9 @@ class MarkingService:
                 percentage=qr_percentage,
                 questions=qr_results,
                 responses=clean_response,
-                marked_image=final_marked,
-                multi_marked=multi_marked
+                marked_image=clean_img,  # Use clean image
+                multi_marked=multi_marked,
+                template=template  # Pass template
             )
             ar_result = MarkingResult(
                 success=True,
@@ -281,15 +287,17 @@ class MarkingService:
                 percentage=ar_percentage,
                 questions=ar_results,
                 responses=clean_response,
-                marked_image=final_marked,
-                multi_marked=multi_marked
+                marked_image=clean_img,  # Use clean image
+                multi_marked=multi_marked,
+                template=template  # Pass template
             )
             return QRARMarkingResult(
                 success=True,
                 qr=qr_result,
                 ar=ar_result,
-                marked_image=final_marked,
-                multi_marked=multi_marked
+                marked_image=clean_img,  # Use clean image
+                multi_marked=multi_marked,
+                template=template  # Pass template
             )
         except Exception as e:
             return QRARMarkingResult(

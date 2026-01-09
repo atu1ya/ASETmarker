@@ -54,6 +54,8 @@ class ImageInstanceOps:
             )
             if img.max() > img.min():
                 img = ImageUtils.normalize_util(img)
+            # Store clean image before any annotations
+            clean_img = img.copy()
             # Processing copies
             transp_layer = img.copy()
             final_marked = img.copy()
@@ -427,7 +429,7 @@ class ImageInstanceOps:
                 for i in range(config.outputs.save_image_level):
                     self.save_image_stacks(i + 1, name, save_dir)
 
-            return omr_response, final_marked, multi_marked, multi_roll
+            return omr_response, final_marked, multi_marked, multi_roll, clean_img
 
         except Exception as e:
             raise e
