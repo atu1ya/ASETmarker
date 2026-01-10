@@ -16,6 +16,7 @@ from web.app import templates
 from web.config import Settings
 from web.dependencies import get_settings, require_configuration
 from web.services import AnalysisService, AnnotatorService, MarkingService, ReportService
+from web.services.docx_report import DocxReportGenerator
 from web.session_store import MarkingConfiguration
 
 router = APIRouter()
@@ -138,7 +139,7 @@ async def process_batch(
 
         marking_service = MarkingService(settings.CONFIG_DIR)
         analysis_service = AnalysisService(config.concept_mapping) if config.has_concept_mapping else None
-        report_service = ReportService() if config.has_concept_mapping else None
+        docx_generator = DocxReportGenerator() if config.has_concept_mapping else None
         annotator_service = AnnotatorService()
 
         def _process_batch_student(student, sheets_archive_ctx):
@@ -227,20 +228,24 @@ async def process_batch(
                 ]
                 
                 # Generate analysis and report only if concept mapping exists
-                if analysis_service and report_service and qr_result and ar_result:
+                if analysis_service and docx_generator and qr_result and ar_result:
                     full_analysis = analysis_service.generate_full_analysis(
                         reading_result,
                         qr_result,
                         ar_result,
                     )
-                    report_pdf = report_service.generate_student_report(
-                        full_analysis,
-                        student_name,
-                        writing_score=writing_score
+                    # Generate Word document report using docxtpl
+                    docx_bytes = docx_generator.generate_report_bytes(
+                        student_data={
+                            'name': student_name,
+                            'writing_score': writing_score,
+                        },
+                        flow_type='batch',
+                        analysis=full_analysis,
                     )
                     results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
                     artifacts.extend([
-                        (base_path + f"{folder_name}_Report.pdf", report_pdf),
+                        (base_path + f"{folder_name}_Report.docx", docx_bytes),
                         (base_path + f"{folder_name}_results.json", results_json),
                     ])
                 

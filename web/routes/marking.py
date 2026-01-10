@@ -14,6 +14,7 @@ from web.app import templates
 from web.config import Settings
 from web.dependencies import get_current_session, get_marking_config, get_settings, require_configuration
 from web.services import AnalysisService, AnnotatorService, MarkingService, ReportService
+from web.services.docx_report import DocxReportGenerator
 from web.session_store import MarkingConfiguration
 
 router = APIRouter()
@@ -214,13 +215,18 @@ async def process_single_student(
                 qr_result,
                 ar_result,
             )
-            report_service = ReportService()
-            report_pdf = report_service.generate_student_report(
-                full_analysis,
-                student_name,
-                writing_score=writing_score
+            
+            # Generate Word document report using docxtpl
+            docx_generator = DocxReportGenerator()
+            docx_bytes = docx_generator.generate_report_bytes(
+                student_data={
+                    'name': student_name,
+                    'writing_score': writing_score,
+                },
+                flow_type='standard',
+                analysis=full_analysis,
             )
-            bundle.writestr(f"{folder_name}_Report.pdf", report_pdf)
+            bundle.writestr(f"{folder_name}_Report.docx", docx_bytes)
             
             # JSON results
             import dataclasses

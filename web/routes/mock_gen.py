@@ -10,6 +10,7 @@ from web.app import templates
 from web.config import Settings
 from web.dependencies import get_current_session, get_settings
 from web.services.mock_report_service import MockReportService
+from web.services.docx_report import DocxReportGenerator
 
 router = APIRouter()
 
@@ -42,7 +43,7 @@ async def generate_mock_reports(
     session_token: str = Depends(get_current_session),
     settings: Settings = Depends(get_settings),
 ):
-    """Process the CSV and generate mock reports."""
+    """Process the CSV and generate mock reports using docxtpl Word templates."""
     # Validate file type
     if not csv_file.filename or not csv_file.filename.lower().endswith('.csv'):
         raise HTTPException(
@@ -71,17 +72,23 @@ async def generate_mock_reports(
                 detail="No valid student data found in CSV.",
             )
         
-        # Generate ZIP archive with PDFs and email templates
+        # Initialize DocX report generator
+        docx_generator = DocxReportGenerator()
+        
+        # Generate ZIP archive with Word reports and email templates
         zip_buffer = io.BytesIO()
         
         with ZipFile(zip_buffer, "w") as bundle:
             for student in students_data:
-                # Generate PDF report
-                pdf_bytes = mock_service.generate_pdf_report(student)
+                # Generate Word report using docxtpl (flow_type='mock')
+                docx_bytes = docx_generator.generate_report_bytes(
+                    student_data=student,
+                    flow_type='mock',
+                )
                 safe_name = student['name'].replace(' ', '_')
-                bundle.writestr(f"{safe_name}_Report.pdf", pdf_bytes)
+                bundle.writestr(f"{safe_name}_Report.docx", docx_bytes)
                 
-                # Generate email template
+                # Generate email template (keep existing text generation)
                 email_text = mock_service.generate_email_template(student)
                 bundle.writestr(f"{safe_name}_Email.txt", email_text.encode('utf-8'))
         
@@ -90,6 +97,11 @@ async def generate_mock_reports(
         headers = {"Content-Disposition": f"attachment; filename={filename}"}
         return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)
         
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Report template not found: {str(e)}",
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
