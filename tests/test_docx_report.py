@@ -281,18 +281,29 @@ class TestBuildContext:
         context = generator._build_context_from_dict(student_data, FlowType.MOCK)
         
         assert context["student_name"] == "Test Student"
-        assert context["reading_score"] == 100.0
         assert context["writing_score"] == 95.0
-        assert context["qr_score"] == 88.0
-        assert context["ar_score"] == 92.0
         assert context["total_score"] == 375.0
         
+        # Check nested structure
+        assert "reading" in context
+        assert "qr" in context
+        assert "ar" in context
+        
+        assert context["reading"]["score"] == 100.0
+        assert context["qr"]["score"] == 88.0
+        assert context["ar"]["score"] == 92.0
+        
+        # Check backward compatibility flat keys
+        assert context["reading_score"] == 100.0
+        assert context["qr_score"] == 88.0
+        assert context["ar_score"] == 92.0
+        
         # Mock flow: all concepts should have empty checkmarks
-        for concept in context["reading_concepts"]:
+        for concept in context["reading"]["concepts"]:
             assert concept["done_well"] == ""
             assert concept["improve"] == ""
         
-        for concept in context["qr_concepts"]:
+        for concept in context["qr"]["concepts"]:
             assert concept["done_well"] == ""
             assert concept["improve"] == ""
     
@@ -324,7 +335,27 @@ class TestBuildContext:
         assert context["student_name"] == "Analysis Student"
         assert context["writing_score"] == 85.0
         
-        # Check reading concepts include mastery marks
+        # Check nested structure exists
+        assert "reading" in context
+        assert "qr" in context
+        assert "ar" in context
+        
+        # Check reading nested structure
+        assert context["reading"]["score"] == 8  # 5 + 3
+        assert context["reading"]["total"] == 14  # 6 + 8
+        assert "concepts" in context["reading"]
+        assert len(context["reading"]["concepts"]) == len(DEFAULT_READING_CONCEPTS)
+        
+        # Check qr nested structure
+        assert context["qr"]["score"] == 4
+        assert context["qr"]["total"] == 4
+        assert "concepts" in context["qr"]
+        
+        # Check ar nested structure
+        assert context["ar"]["score"] == 10
+        assert context["ar"]["total"] == 15
+        
+        # Check backward compatibility flat keys
         assert "reading_concepts" in context
         assert len(context["reading_concepts"]) == len(DEFAULT_READING_CONCEPTS)
 
@@ -403,7 +434,7 @@ class TestGenerateReport:
                     pass  # Template rendering may fail, but flow type should be handled
     
     def test_context_keys_structure(self, tmp_path):
-        """Test that generated context has required keys."""
+        """Test that generated context has required keys including nested structure."""
         template_file = tmp_path / "template.docx"
         template_file.touch()
         
@@ -421,8 +452,30 @@ class TestGenerateReport:
             
             context = generator._build_context_from_dict(student_data, FlowType.STANDARD)
             
-            # Verify required keys exist
-            required_keys = [
+            # Verify nested structure keys exist
+            assert "reading" in context
+            assert "qr" in context
+            assert "ar" in context
+            
+            # Verify nested reading structure
+            assert "score" in context["reading"]
+            assert "total" in context["reading"]
+            assert "percentage" in context["reading"]
+            assert "concepts" in context["reading"]
+            
+            # Verify nested qr structure
+            assert "score" in context["qr"]
+            assert "total" in context["qr"]
+            assert "percentage" in context["qr"]
+            assert "concepts" in context["qr"]
+            
+            # Verify nested ar structure
+            assert "score" in context["ar"]
+            assert "total" in context["ar"]
+            assert "percentage" in context["ar"]
+            
+            # Verify backward compatibility flat keys
+            required_flat_keys = [
                 "student_name",
                 "reading_score",
                 "writing_score",
@@ -433,15 +486,12 @@ class TestGenerateReport:
                 "qr_concepts",
             ]
             
-            for key in required_keys:
+            for key in required_flat_keys:
                 assert key in context, f"Missing required key: {key}"
             
-            # Verify concept structure
-            assert isinstance(context["reading_concepts"], list)
-            assert isinstance(context["qr_concepts"], list)
-            
-            if context["reading_concepts"]:
-                concept = context["reading_concepts"][0]
+            # Verify concept structure in nested reading
+            if context["reading"]["concepts"]:
+                concept = context["reading"]["concepts"][0]
                 assert "name" in concept
                 assert "done_well" in concept
                 assert "improve" in concept

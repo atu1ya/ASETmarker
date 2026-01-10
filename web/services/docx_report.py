@@ -333,18 +333,28 @@ class DocxReportGenerator:
             flow_type: The flow type
             
         Returns:
-            Dictionary ready to be passed to docxtpl
+            Dictionary ready to be passed to docxtpl with nested subject structures
         """
-        # Extract scores from analysis
+        # Extract area results from analysis
+        # Map full subject names to short codes
         reading_areas = analysis.subject_areas.get('Reading', [])
         qr_areas = analysis.subject_areas.get('Quantitative Reasoning', [])
         ar_areas = analysis.subject_areas.get('Abstract Reasoning', [])
         
-        # Calculate total scores from area results
-        reading_score = sum(a.correct for a in reading_areas)
-        qr_score = sum(a.correct for a in qr_areas)
-        ar_score = sum(a.correct for a in ar_areas)
-        total_score = reading_score + qr_score + ar_score + writing_score
+        # Calculate scores and totals from area results
+        reading_correct = sum(a.correct for a in reading_areas)
+        reading_total = sum(a.total for a in reading_areas)
+        reading_percentage = (reading_correct / reading_total * 100) if reading_total > 0 else 0
+        
+        qr_correct = sum(a.correct for a in qr_areas)
+        qr_total = sum(a.total for a in qr_areas)
+        qr_percentage = (qr_correct / qr_total * 100) if qr_total > 0 else 0
+        
+        ar_correct = sum(a.correct for a in ar_areas)
+        ar_total = sum(a.total for a in ar_areas)
+        ar_percentage = (ar_correct / ar_total * 100) if ar_total > 0 else 0
+        
+        total_score = reading_correct + qr_correct + ar_correct + writing_score
         
         # Build concept lists with mastery ticks
         reading_concepts = self._build_concept_mastery_list(
@@ -356,11 +366,32 @@ class DocxReportGenerator:
         
         return {
             "student_name": student_name,
-            "reading_score": reading_score,
-            "writing_score": writing_score,
-            "qr_score": qr_score,
-            "ar_score": ar_score,
             "total_score": total_score,
+            "writing_score": writing_score,
+            # Nested reading structure
+            "reading": {
+                "score": reading_correct,
+                "total": reading_total,
+                "percentage": round(reading_percentage, 1),
+                "concepts": reading_concepts,
+            },
+            # Nested qr structure
+            "qr": {
+                "score": qr_correct,
+                "total": qr_total,
+                "percentage": round(qr_percentage, 1),
+                "concepts": qr_concepts,
+            },
+            # Nested ar structure
+            "ar": {
+                "score": ar_correct,
+                "total": ar_total,
+                "percentage": round(ar_percentage, 1),
+            },
+            # Keep flat versions for backward compatibility
+            "reading_score": reading_correct,
+            "qr_score": qr_correct,
+            "ar_score": ar_correct,
             "reading_concepts": reading_concepts,
             "qr_concepts": qr_concepts,
         }
@@ -378,7 +409,7 @@ class DocxReportGenerator:
             flow_type: The flow type
             
         Returns:
-            Dictionary ready to be passed to docxtpl
+            Dictionary ready to be passed to docxtpl with nested subject structures
         """
         student_name = student_data.get('name', student_data.get('student_name', 'Unknown'))
         reading_score = float(student_data.get('reading', student_data.get('reading_score', 0)))
@@ -386,6 +417,16 @@ class DocxReportGenerator:
         qr_score = float(student_data.get('qr', student_data.get('qr_score', 0)))
         ar_score = float(student_data.get('ar', student_data.get('ar_score', 0)))
         total_score = float(student_data.get('total', student_data.get('total_score', 0)))
+        
+        # Default totals for percentage calculation (standard test totals)
+        reading_total = float(student_data.get('reading_total', 35))
+        qr_total = float(student_data.get('qr_total', 35))
+        ar_total = float(student_data.get('ar_total', 35))
+        
+        # Calculate percentages
+        reading_percentage = (reading_score / reading_total * 100) if reading_total > 0 else 0
+        qr_percentage = (qr_score / qr_total * 100) if qr_total > 0 else 0
+        ar_percentage = (ar_score / ar_total * 100) if ar_total > 0 else 0
         
         # For mock flow, or if no analysis data is provided, use empty mastery
         reading_concepts = self._build_concept_mastery_list(
@@ -397,11 +438,32 @@ class DocxReportGenerator:
         
         return {
             "student_name": student_name,
-            "reading_score": reading_score,
+            "total_score": total_score,
             "writing_score": writing_score,
+            # Nested reading structure
+            "reading": {
+                "score": reading_score,
+                "total": reading_total,
+                "percentage": round(reading_percentage, 1),
+                "concepts": reading_concepts,
+            },
+            # Nested qr structure
+            "qr": {
+                "score": qr_score,
+                "total": qr_total,
+                "percentage": round(qr_percentage, 1),
+                "concepts": qr_concepts,
+            },
+            # Nested ar structure
+            "ar": {
+                "score": ar_score,
+                "total": ar_total,
+                "percentage": round(ar_percentage, 1),
+            },
+            # Keep flat versions for backward compatibility
+            "reading_score": reading_score,
             "qr_score": qr_score,
             "ar_score": ar_score,
-            "total_score": total_score,
             "reading_concepts": reading_concepts,
             "qr_concepts": qr_concepts,
         }
@@ -451,10 +513,10 @@ class DocxReportGenerator:
         
         # Generate and add chart image
         scores = {
-            "Reading": context["reading_score"],
+            "Reading": context["reading"]["score"],
             "Writing": context["writing_score"],
-            "QR": context["qr_score"],
-            "AR": context["ar_score"],
+            "QR": context["qr"]["score"],
+            "AR": context["ar"]["score"],
         }
         
         chart_buffer = self._create_bar_chart(
