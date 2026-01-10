@@ -153,6 +153,73 @@ class DocxReportGenerator:
     - Mock: No concept mastery evaluation (all checkmarks blank)
     - Standard: Full mastery evaluation based on 51% threshold
     - Batch: Same as Standard, for multiple students
+    
+    Template Context Structure
+    --------------------------
+    The template receives a context dictionary with the following structure:
+    
+    ```
+    {
+        "student_name": "John Smith",
+        "total_score": 85.00,
+        "writing_score": 25.00,
+        
+        "reading": {
+            "score": 28.00,
+            "total": 35.00,
+            "percentage": 80.00,
+            "concepts": [
+                {"name": "Main Idea & Theme", "done_well": "✓", "improve": ""},
+                {"name": "Inference & Interpretation", "done_well": "", "improve": "✓"},
+                ...
+            ]
+        },
+        
+        "qr": {
+            "score": 30.00,
+            "total": 35.00,
+            "percentage": 85.71,
+            "concepts": [...]
+        },
+        
+        "ar": {
+            "score": 27.00,
+            "total": 35.00,
+            "percentage": 77.14
+        },
+        
+        "graph_image": <InlineImage>,  # Bar chart as inline image
+        
+        # Flat versions for backward compatibility
+        "reading_score": 28.00,
+        "qr_score": 30.00,
+        "ar_score": 27.00,
+        "reading_concepts": [...],
+        "qr_concepts": [...]
+    }
+    ```
+    
+    Template Syntax Examples
+    ------------------------
+    Use Jinja2 syntax within the Word template:
+    
+    - Simple values: {{ student_name }}, {{ total_score }}
+    - Nested values: {{ reading.score }}, {{ reading.percentage }}
+    - Inline image: {{ graph_image }}
+    
+    - Concept table loop:
+        {% for c in reading.concepts %}
+        {{ c.name }} | {{ c.done_well }} | {{ c.improve }}
+        {% endfor %}
+    
+    - Conditional display:
+        {% if reading.percentage >= 51 %}Passed{% else %}Needs work{% endif %}
+    
+    Notes:
+    - All numeric values are rounded to 2 decimal places
+    - Checkmarks use Unicode "✓" character
+    - Mock flow leaves all checkmark columns blank
+    - Concept names come from the actual concept mapping JSON, not hardcoded defaults
     """
     
     def __init__(
@@ -263,15 +330,19 @@ class DocxReportGenerator:
     
     def _build_concept_mastery_list(
         self,
-        concept_names: List[str],
+        default_concept_names: List[str],
         area_results: Optional[List[LearningAreaResult]] = None,
         flow_type: FlowType = FlowType.STANDARD,
     ) -> List[Dict[str, str]]:
         """
         Build concept mastery list with tick marks.
         
+        When area_results is provided (standard/batch flow with analysis), the
+        concept names are extracted directly from the LearningAreaResult objects.
+        When area_results is None (mock flow or no analysis), uses default_concept_names.
+        
         Args:
-            concept_names: List of concept names
+            default_concept_names: Fallback list of concept names (used when no area_results)
             area_results: Optional list of LearningAreaResult objects with mastery data
             flow_type: The flow type (affects mastery calculation)
             
@@ -280,39 +351,37 @@ class DocxReportGenerator:
         """
         concepts = []
         
-        # Create lookup from area_results if provided
-        mastery_lookup: Dict[str, float] = {}
-        status_lookup: Dict[str, str] = {}
-        if area_results:
-            for result in area_results:
-                mastery_lookup[result.area] = result.percentage
-                status_lookup[result.area] = result.status
-        
-        for concept_name in concept_names:
-            if flow_type == FlowType.MOCK:
-                # Mock flow: both checkmarks empty
+        if flow_type == FlowType.MOCK:
+            # Mock flow: use default concept names with empty checkmarks
+            for concept_name in default_concept_names:
                 concepts.append({
                     "name": concept_name,
                     "done_well": "",
                     "improve": "",
                 })
-            else:
-                # Standard/Batch flow: evaluate mastery
-                percentage = mastery_lookup.get(concept_name, 0.0)
-                status = status_lookup.get(concept_name, "")
-                
-                if status == "Done well" or percentage >= MASTERY_THRESHOLD:
+        elif area_results:
+            # Standard/Batch flow WITH analysis: use actual concept names from results
+            for result in area_results:
+                if result.status == "Done well" or result.percentage >= MASTERY_THRESHOLD:
                     concepts.append({
-                        "name": concept_name,
+                        "name": result.area,
                         "done_well": "✓",
                         "improve": "",
                     })
                 else:
                     concepts.append({
-                        "name": concept_name,
+                        "name": result.area,
                         "done_well": "",
                         "improve": "✓",
                     })
+        else:
+            # Standard/Batch flow WITHOUT analysis: use defaults with "needs improvement"
+            for concept_name in default_concept_names:
+                concepts.append({
+                    "name": concept_name,
+                    "done_well": "",
+                    "improve": "✓",
+                })
         
         return concepts
     
@@ -366,32 +435,32 @@ class DocxReportGenerator:
         
         return {
             "student_name": student_name,
-            "total_score": total_score,
-            "writing_score": writing_score,
+            "total_score": round(total_score, 2),
+            "writing_score": round(writing_score, 2),
             # Nested reading structure
             "reading": {
-                "score": reading_correct,
-                "total": reading_total,
-                "percentage": round(reading_percentage, 1),
+                "score": round(reading_correct, 2),
+                "total": round(reading_total, 2),
+                "percentage": round(reading_percentage, 2),
                 "concepts": reading_concepts,
             },
             # Nested qr structure
             "qr": {
-                "score": qr_correct,
-                "total": qr_total,
-                "percentage": round(qr_percentage, 1),
+                "score": round(qr_correct, 2),
+                "total": round(qr_total, 2),
+                "percentage": round(qr_percentage, 2),
                 "concepts": qr_concepts,
             },
             # Nested ar structure
             "ar": {
-                "score": ar_correct,
-                "total": ar_total,
-                "percentage": round(ar_percentage, 1),
+                "score": round(ar_correct, 2),
+                "total": round(ar_total, 2),
+                "percentage": round(ar_percentage, 2),
             },
             # Keep flat versions for backward compatibility
-            "reading_score": reading_correct,
-            "qr_score": qr_correct,
-            "ar_score": ar_correct,
+            "reading_score": round(reading_correct, 2),
+            "qr_score": round(qr_correct, 2),
+            "ar_score": round(ar_correct, 2),
             "reading_concepts": reading_concepts,
             "qr_concepts": qr_concepts,
         }
@@ -438,32 +507,32 @@ class DocxReportGenerator:
         
         return {
             "student_name": student_name,
-            "total_score": total_score,
-            "writing_score": writing_score,
+            "total_score": round(total_score, 2),
+            "writing_score": round(writing_score, 2),
             # Nested reading structure
             "reading": {
-                "score": reading_score,
-                "total": reading_total,
-                "percentage": round(reading_percentage, 1),
+                "score": round(reading_score, 2),
+                "total": round(reading_total, 2),
+                "percentage": round(reading_percentage, 2),
                 "concepts": reading_concepts,
             },
             # Nested qr structure
             "qr": {
-                "score": qr_score,
-                "total": qr_total,
-                "percentage": round(qr_percentage, 1),
+                "score": round(qr_score, 2),
+                "total": round(qr_total, 2),
+                "percentage": round(qr_percentage, 2),
                 "concepts": qr_concepts,
             },
             # Nested ar structure
             "ar": {
-                "score": ar_score,
-                "total": ar_total,
-                "percentage": round(ar_percentage, 1),
+                "score": round(ar_score, 2),
+                "total": round(ar_total, 2),
+                "percentage": round(ar_percentage, 2),
             },
             # Keep flat versions for backward compatibility
-            "reading_score": reading_score,
-            "qr_score": qr_score,
-            "ar_score": ar_score,
+            "reading_score": round(reading_score, 2),
+            "qr_score": round(qr_score, 2),
+            "ar_score": round(ar_score, 2),
             "reading_concepts": reading_concepts,
             "qr_concepts": qr_concepts,
         }

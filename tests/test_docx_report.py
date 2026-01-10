@@ -344,12 +344,20 @@ class TestBuildContext:
         assert context["reading"]["score"] == 8  # 5 + 3
         assert context["reading"]["total"] == 14  # 6 + 8
         assert "concepts" in context["reading"]
-        assert len(context["reading"]["concepts"]) == len(DEFAULT_READING_CONCEPTS)
+        # Concepts should match the actual analysis results, not hardcoded defaults
+        assert len(context["reading"]["concepts"]) == 2
+        assert context["reading"]["concepts"][0]["name"] == "Understanding main ideas"
+        assert context["reading"]["concepts"][0]["done_well"] == "✓"
+        assert context["reading"]["concepts"][1]["name"] == "Inference and deduction"
+        assert context["reading"]["concepts"][1]["improve"] == "✓"
         
         # Check qr nested structure
         assert context["qr"]["score"] == 4
         assert context["qr"]["total"] == 4
         assert "concepts" in context["qr"]
+        assert len(context["qr"]["concepts"]) == 1
+        assert context["qr"]["concepts"][0]["name"] == "Algebra"
+        assert context["qr"]["concepts"][0]["done_well"] == "✓"
         
         # Check ar nested structure
         assert context["ar"]["score"] == 10
@@ -357,7 +365,7 @@ class TestBuildContext:
         
         # Check backward compatibility flat keys
         assert "reading_concepts" in context
-        assert len(context["reading_concepts"]) == len(DEFAULT_READING_CONCEPTS)
+        assert len(context["reading_concepts"]) == 2
 
 
 class TestCreateBarChart:
