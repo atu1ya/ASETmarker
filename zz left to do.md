@@ -10,6 +10,10 @@ just make something where they can make the reports automatically and quickly an
 
 
 
+1. report gen 
+
+
+
 
 
 
@@ -17,3 +21,9 @@ just make something where they can make the reports automatically and quickly an
 2. ensure manifest generator is present in the top banner for people to select
 3. ensure that the correct scores from the answer booklet are being transferred onto the report
 4. deploy
+
+
+
+
+
+batch processing, make sure it gives me a summary excel sheet or csv with every student's scoes, and averages for each section

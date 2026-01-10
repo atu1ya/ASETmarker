@@ -215,7 +215,11 @@ async def process_single_student(
                 ar_result,
             )
             report_service = ReportService()
-            report_pdf = report_service.generate_student_report(full_analysis, student_name)
+            report_pdf = report_service.generate_student_report(
+                full_analysis,
+                student_name,
+                writing_score=writing_score
+            )
             bundle.writestr(f"{folder_name}_Report.pdf", report_pdf)
             
             # JSON results

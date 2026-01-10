@@ -41,15 +41,31 @@ def test_analysis_service_stub():
 
 
 def test_report_service_stub(tmp_path):
+    from web.services.analysis import FullAnalysis, LearningAreaResult
+    
     assets_dir = tmp_path
     service = ReportService(assets_dir)
+    
+    # Create a minimal FullAnalysis object
+    analysis = FullAnalysis(
+        subject_areas={
+            "Reading": [
+                LearningAreaResult(area="Comprehension", correct=5, total=10, percentage=50.0, status="Needs improvement"),
+            ],
+            "Quantitative Reasoning": [
+                LearningAreaResult(area="Number Patterns", correct=8, total=10, percentage=80.0, status="Done well"),
+            ],
+            "Abstract Reasoning": [
+                LearningAreaResult(area="Pattern Recognition", correct=7, total=10, percentage=70.0, status="Done well"),
+            ],
+        },
+        summary={}
+    )
+    
     pdf_bytes = service.generate_student_report(
-        "Student",
-        {"subject": "Reading", "questions": []},
-        {"subject": "QR", "questions": []},
-        {"subject": "AR", "questions": []},
-        90,
-        {},
+        analysis,
+        student_name="Test Student",
+        writing_score=85,
     )
     assert pdf_bytes.startswith(b"%PDF")
 

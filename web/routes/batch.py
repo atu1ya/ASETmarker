@@ -233,7 +233,11 @@ async def process_batch(
                         qr_result,
                         ar_result,
                     )
-                    report_pdf = report_service.generate_student_report(full_analysis, student_name)
+                    report_pdf = report_service.generate_student_report(
+                        full_analysis,
+                        student_name,
+                        writing_score=writing_score
+                    )
                     results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
                     artifacts.extend([
                         (base_path + f"{folder_name}_Report.pdf", report_pdf),
