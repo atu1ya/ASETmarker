@@ -16,6 +16,7 @@ class LearningAreaResult:
     total: int
     percentage: float
     status: str  # "Done well" or "Needs improvement"
+    question_numbers: str = ""  # Comma-separated question numbers (e.g., "1, 2, 5")
 
 @dataclass
 class FullAnalysis:
@@ -36,27 +37,50 @@ class AnalysisService:
         subject: str,
         question_results: List[Dict[str, Any]]
     ) -> SubjectAnalysis:
-        # Build lookup for question correctness
-        correct_lookup = {q["label"]: q["is_correct"] for q in question_results}
+        # Helper function to normalize labels by extracting only digits
+        def normalize_label(label: str) -> str:
+            """Extract only numeric digits from label (e.g., 'RC1', 'q1', '1' -> '1')."""
+            return ''.join(c for c in label if c.isdigit())
+        
+        # Build lookup for question correctness using normalized labels
+        correct_lookup = {normalize_label(q["label"]): q["is_correct"] for q in question_results}
+        
         subject_map = self.concept_map.get(subject, {})
         area_results: List[LearningAreaResult] = []
         mapped_questions = set()
+        
         for area, questions in subject_map.items():
             total = len(questions)
-            correct = sum(1 for q in questions if correct_lookup.get(q, False))
-            percentage = (correct / total * 100.0) if total > 0 else 0.0
+            correct_count = 0
+            question_nums = []
+            
+            for q in questions:
+                normalized_q = normalize_label(q)
+                question_nums.append(normalized_q)
+                if correct_lookup.get(normalized_q, False):
+                    correct_count += 1
+            
+            percentage = (correct_count / total * 100.0) if total > 0 else 0.0
+            # Strictly follow the rule: >= 51.0 is "Done well"
             status = "Done well" if percentage >= self.THRESHOLD else "Needs improvement"
+            
+            # Create comma-separated string of question numbers
+            question_numbers_str = ", ".join(question_nums)
+            
             area_results.append(LearningAreaResult(
                 area=area,
-                correct=correct,
+                correct=correct_count,
                 total=total,
                 percentage=percentage,
-                status=status
+                status=status,
+                question_numbers=question_numbers_str
             ))
             mapped_questions.update(questions)
+        
         # Find unmapped questions
-        all_labels = set(correct_lookup.keys())
+        all_labels = set(q["label"] for q in question_results)
         unmapped = list(all_labels - mapped_questions)
+        
         return SubjectAnalysis(
             subject=subject,
             area_results=area_results,

@@ -363,75 +363,80 @@ class DocxReportGenerator:
     
     def _build_concept_mastery_list(
         self,
-        default_concept_names: List[str],
+        concept_names: List[str],
         subject_name: str,
         area_results: Optional[List[LearningAreaResult]] = None,
         flow_type: FlowType = FlowType.STANDARD,
     ) -> List[ConceptMastery]:
         """
-        Build concept mastery list in default order with tick marks and question numbers.
+        Build concept mastery list with tick marks and question numbers.
         
-        Always iterates through default_concept_names to ensure the output list order
-        strictly matches the default list. For each concept, finds the matching
-        LearningAreaResult (if available) and calculates mastery accordingly.
+        Uses actual concept names from area_results when available.
+        For each concept, prioritizes question_numbers from LearningAreaResult,
+        falling back to CONCEPT_QUESTION_MAPPING if needed.
         
         Args:
-            default_concept_names: List of concept names in the desired order
+            concept_names: List of concept names (used as fallback if no area_results)
             subject_name: Subject name for question number lookup (e.g., 'Reading', 'Quantitative Reasoning')
             area_results: Optional list of LearningAreaResult objects with mastery data
             flow_type: The flow type (affects mastery calculation)
             
         Returns:
-            List of ConceptMastery objects in the order of default_concept_names
+            List of ConceptMastery objects
         """
         concepts = []
         question_map = CONCEPT_QUESTION_MAPPING.get(subject_name, {})
         
-        # Create a lookup dict for area_results by concept name
-        results_by_name = {}
-        if area_results:
+        if flow_type == FlowType.MOCK:
+            # Mock flow: use provided concept names with empty checkmarks
+            for concept_name in concept_names:
+                questions = question_map.get(concept_name, '')
+                concepts.append(ConceptMastery(
+                    name=concept_name,
+                    done_well="",
+                    improve="",
+                    questions=questions,
+                ))
+        elif area_results:
+            # Standard/Batch flow WITH analysis: use actual results from analysis
             for result in area_results:
-                results_by_name[result.area] = result
-        
-        # Always iterate through default_concept_names to maintain strict order
-        for concept_name in default_concept_names:
-            # Look up question numbers from mapping
-            questions = question_map.get(concept_name, '')
-            
-            # Find matching result if available
-            result = results_by_name.get(concept_name)
-            
-            if flow_type == FlowType.MOCK:
-                # Mock flow: empty checkmarks
-                done_well = ""
-                improve = ""
-            elif result:
-                # Standard/Batch flow WITH matching result: calculate based on mastery
-                if result.status == "Done well" or result.percentage >= MASTERY_THRESHOLD:
+                # Prioritize question_numbers from result, fallback to mapping
+                if hasattr(result, 'question_numbers') and result.question_numbers:
+                    questions = result.question_numbers
+                else:
+                    questions = question_map.get(result.area, '')
+                
+                # Verify percentage >= MASTERY_THRESHOLD (51.0) for "Done well"
+                if result.percentage >= MASTERY_THRESHOLD:
                     done_well = "✓"
                     improve = ""
                 else:
                     done_well = ""
                     improve = "✓"
-            else:
-                # Standard/Batch flow WITHOUT matching result: default to "needs improvement"
-                done_well = ""
-                improve = "✓"
-            
-            concepts.append(ConceptMastery(
-                name=concept_name,
-                done_well=done_well,
-                improve=improve,
-                questions=questions,
-            ))
+                
+                concepts.append(ConceptMastery(
+                    name=result.area,
+                    done_well=done_well,
+                    improve=improve,
+                    questions=questions,
+                ))
+        else:
+            # Standard/Batch flow WITHOUT analysis: use provided names with "needs improvement"
+            for concept_name in concept_names:
+                questions = question_map.get(concept_name, '')
+                concepts.append(ConceptMastery(
+                    name=concept_name,
+                    done_well="",
+                    improve="✓",
+                    questions=questions,
+                ))
         
         return concepts
     
     def _build_context_from_analysis(
         self,
         analysis: FullAnalysis,
-        student_name: str,
-        writing_score: float = 0,
+        student_data: Dict[str, Any],
         flow_type: FlowType = FlowType.STANDARD,
     ) -> Dict[str, Any]:
         """
@@ -439,40 +444,71 @@ class DocxReportGenerator:
         
         Args:
             analysis: FullAnalysis object from the marking process
-            student_name: Name of the student
-            writing_score: Writing score (not in OMR analysis)
+            student_data: Dictionary containing student info and scores (name, writing_score, reading_score, qr_score, ar_score)
             flow_type: The flow type
             
         Returns:
             Dictionary ready to be passed to docxtpl with nested subject structures
         """
+        # Extract student info
+        student_name = student_data.get('name', student_data.get('student_name', 'Unknown'))
+        writing_score = float(student_data.get('writing', student_data.get('writing_score', 0)))
         # Extract area results from analysis
         # Map full subject names to short codes
         reading_areas = analysis.subject_areas.get('Reading', [])
         qr_areas = analysis.subject_areas.get('Quantitative Reasoning', [])
         ar_areas = analysis.subject_areas.get('Abstract Reasoning', [])
         
-        # Calculate scores and totals from area results
-        reading_correct = sum(a.correct for a in reading_areas)
-        reading_total = sum(a.total for a in reading_areas)
-        reading_percentage = (reading_correct / reading_total * 100) if reading_total > 0 else 0
+        # Use passed scores if available, otherwise calculate from area results
+        if 'reading_score' in student_data:
+            reading_correct = float(student_data['reading_score'])
+        else:
+            reading_correct = sum(a.correct for a in reading_areas)
         
-        qr_correct = sum(a.correct for a in qr_areas)
-        qr_total = sum(a.total for a in qr_areas)
-        qr_percentage = (qr_correct / qr_total * 100) if qr_total > 0 else 0
+        if 'qr_score' in student_data:
+            qr_correct = float(student_data['qr_score'])
+        else:
+            qr_correct = sum(a.correct for a in qr_areas)
         
-        ar_correct = sum(a.correct for a in ar_areas)
-        ar_total = sum(a.total for a in ar_areas)
-        ar_percentage = (ar_correct / ar_total * 100) if ar_total > 0 else 0
+        if 'ar_score' in student_data:
+            ar_correct = float(student_data['ar_score'])
+        else:
+            ar_correct = sum(a.correct for a in ar_areas)
+        
+        # Use passed totals if available, otherwise default to 35 (standard exam total)
+        # This ensures correct percentages even if concept mapping is incomplete
+        if 'reading_total' in student_data:
+            reading_total = float(student_data['reading_total'])
+        else:
+            reading_total = 35.0
+        
+        if 'qr_total' in student_data:
+            qr_total = float(student_data['qr_total'])
+        else:
+            qr_total = 35.0
+        
+        if 'ar_total' in student_data:
+            ar_total = float(student_data['ar_total'])
+        else:
+            ar_total = 35.0
+        
+        # Calculate percentages and round to 2 decimal places
+        reading_percentage = round((reading_correct / reading_total * 100) if reading_total > 0 else 0, 2)
+        qr_percentage = round((qr_correct / qr_total * 100) if qr_total > 0 else 0, 2)
+        ar_percentage = round((ar_correct / ar_total * 100) if ar_total > 0 else 0, 2)
         
         total_score = reading_correct + qr_correct + ar_correct + writing_score
         
         # Build concept lists with mastery ticks and question numbers
+        # Use actual concept names from analysis results, not hardcoded defaults
+        reading_concept_names = [area.area for area in reading_areas] if reading_areas else DEFAULT_READING_CONCEPTS
+        qr_concept_names = [area.area for area in qr_areas] if qr_areas else DEFAULT_QR_CONCEPTS
+        
         reading_concepts_objs = self._build_concept_mastery_list(
-            DEFAULT_READING_CONCEPTS, 'Reading', reading_areas, flow_type
+            reading_concept_names, 'Reading', reading_areas, flow_type
         )
         qr_concepts_objs = self._build_concept_mastery_list(
-            DEFAULT_QR_CONCEPTS, 'Quantitative Reasoning', qr_areas, flow_type
+            qr_concept_names, 'Quantitative Reasoning', qr_areas, flow_type
         )
         
         # Convert to dicts with all fields including aliases
@@ -682,10 +718,8 @@ class DocxReportGenerator:
         
         # Build context based on data source
         if analysis is not None:
-            student_name = student_data.get('name', student_data.get('student_name', 'Unknown'))
-            writing_score = float(student_data.get('writing', student_data.get('writing_score', 0)))
             context = self._build_context_from_analysis(
-                analysis, student_name, writing_score, flow
+                analysis, student_data, flow
             )
         else:
             context = self._build_context_from_dict(student_data, flow)

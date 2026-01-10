@@ -222,6 +222,12 @@ async def process_single_student(
                 student_data={
                     'name': student_name,
                     'writing_score': writing_score,
+                    'reading_score': reading_result.score,
+                    'reading_total': len(config.reading_answers),
+                    'qr_score': qr_result.score,
+                    'qr_total': len(config.qr_answers),
+                    'ar_score': ar_result.score,
+                    'ar_total': len(config.ar_answers),
                 },
                 flow_type='standard',
                 analysis=full_analysis,

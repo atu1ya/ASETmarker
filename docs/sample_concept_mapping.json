@@ -4,14 +4,14 @@
     "_format": "Each question should appear in exactly ONE area per subject",
 
     "Reading": {
-        "Understanding main ideas": ["rc1", "rc9", "rc17", "rc25"],
-        "Inference and deduction": ["rc2", "rc10", "rc18", "rc26"],
-        "Identifying key details": ["rc3", "rc11", "rc19", "rc27"],
-        "Vocabulary context clues": ["rc4", "rc12", "rc20", "rc28"],
-        "Author's purpose and tone": ["rc5", "rc13", "rc21", "rc29"],
-        "Cause and effect relationships": ["rc6", "rc14", "rc22", "rc30"],
-        "Understanding tone and attitude": ["rc7", "rc15", "rc23", "rc31"],
-        "Figurative / Literary devices": ["rc8", "rc16", "rc24", "rc32", "rc33", "rc34", "rc35"]
+        "Understanding main ideas": ["r1", "r9", "r17", "r25"],
+        "Inference and deduction": ["r2", "r10", "r18", "r26"],
+        "Identifying key details": ["r3", "r11", "r19", "r27"],
+        "Vocabulary context clues": ["r4", "r12", "r20", "r28"],
+        "Author's purpose and tone": ["r5", "r13", "r21", "r29"],
+        "Cause and effect relationships": ["r6", "r14", "r22", "r30"],
+        "Understanding tone and attitude": ["r7", "r15", "r23", "r31"],
+        "Figurative / Literary devices": ["r8", "r16", "r24", "r32", "r33", "r34", "r35"]
     },
 
     "Quantitative Reasoning": {
