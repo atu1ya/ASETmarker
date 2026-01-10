@@ -89,6 +89,15 @@ async def batch_page(request: Request, config: MarkingConfiguration = Depends(re
     )
 
 
+@router.get("/manifest-builder")
+async def manifest_builder(request: Request):
+    """Render the manifest builder page for batch processing."""
+    return templates.TemplateResponse(
+        "manifest_builder.html",
+        {"request": request}
+    )
+
+
 @router.post("/process")
 async def process_batch(
     manifest: UploadFile = File(...),
@@ -139,27 +148,72 @@ async def process_batch(
             qrar_file = student["qrar_file"]
             folder_name = _sanitize_name(student_name)
             base_path = f"{folder_name}/"
-            # Convert answer keys to dicts (label: answer)
-            reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
-            # Combine QR and AR answers for the combined sheet
-            combined_answers = config.qr_answers + config.ar_answers
-            qrar_key = {str(i+1): ans for i, ans in enumerate(combined_answers)}
+            
+            # Convert answer keys to dicts with proper prefixes
+            # Reading: RC1, RC2, ...
+            reading_key = {f"RC{i+1}": ans for i, ans in enumerate(config.reading_answers)}
+            
+            # QR/AR: QR1, QR2, ... + AR1, AR2, ...
+            qrar_key = {}
+            for i, ans in enumerate(config.qr_answers):
+                qrar_key[f"QR{i+1}"] = ans
+            for i, ans in enumerate(config.ar_answers):
+                qrar_key[f"AR{i+1}"] = ans
+            
             # Try to read files and process
             try:
                 reading_bytes = sheets_archive_ctx.read(reading_file)
                 qrar_bytes = sheets_archive_ctx.read(qrar_file)
+                
                 reading_result = marking_service.process_single_subject(
                     subject_name="Reading",
                     image_bytes=reading_bytes,
                     answer_key=reading_key,
                     template_filename="aset_reading_template.json",
                 )
+                
                 qrar_result = marking_service.process_single_subject(
                     subject_name="QR/AR",
                     image_bytes=qrar_bytes,
                     answer_key=qrar_key,
                     template_filename="aset_qrar_template.json",
                 )
+                
+                # Split QR/AR into separate SubjectResults
+                qr_len = len(config.qr_answers)
+                ar_len = len(config.ar_answers)
+                qr_result = None
+                ar_result = None
+                
+                if qrar_result and hasattr(qrar_result, 'results'):
+                    qr_results = qrar_result.results[:qr_len]
+                    ar_results = qrar_result.results[qr_len:qr_len+ar_len]
+                    
+                    # Recalculate scores
+                    qr_score = sum(1 for q in qr_results if getattr(q, 'is_correct', False))
+                    ar_score = sum(1 for q in ar_results if getattr(q, 'is_correct', False))
+                    
+                    # Build new SubjectResult objects
+                    qr_result = SubjectResult(
+                        subject_name="Quantitative Reasoning",
+                        score=qr_score,
+                        total_questions=qr_len,
+                        results=qr_results,
+                        omr_response=qrar_result.omr_response,
+                        marked_image=qrar_result.marked_image,
+                        template=qrar_result.template,
+                        clean_image=getattr(qrar_result, 'clean_image', None)
+                    )
+                    ar_result = SubjectResult(
+                        subject_name="Abstract Reasoning",
+                        score=ar_score,
+                        total_questions=ar_len,
+                        results=ar_results,
+                        omr_response=qrar_result.omr_response,
+                        marked_image=qrar_result.marked_image,
+                        template=qrar_result.template,
+                        clean_image=getattr(qrar_result, 'clean_image', None)
+                    )
                 
                 # Annotate sheets
                 reading_img = annotator_service.annotate_sheet(reading_result)
@@ -168,30 +222,31 @@ async def process_batch(
                 qrar_pdf = annotator_service.image_to_pdf_bytes(qrar_img)
                 
                 artifacts = [
-                    (base_path + "Reading_Marked.pdf", reading_pdf),
-                    (base_path + "QRAR_Marked.pdf", qrar_pdf),
+                    (base_path + f"{folder_name}_Reading_Marked.pdf", reading_pdf),
+                    (base_path + f"{folder_name}_QRAR_Marked.pdf", qrar_pdf),
                 ]
                 
                 # Generate analysis and report only if concept mapping exists
-                if analysis_service and report_service:
+                if analysis_service and report_service and qr_result and ar_result:
                     full_analysis = analysis_service.generate_full_analysis(
                         reading_result,
-                        qrar_result,
-                        empty_ar,
+                        qr_result,
+                        ar_result,
                     )
-                    report_pdf = report_service.generate_student_report(full_analysis)
+                    report_pdf = report_service.generate_student_report(full_analysis, student_name)
                     results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
                     artifacts.extend([
-                        (base_path + "Report.pdf", report_pdf),
-                        (base_path + "results.json", results_json),
+                        (base_path + f"{folder_name}_Report.pdf", report_pdf),
+                        (base_path + f"{folder_name}_results.json", results_json),
                     ])
+                
                 return {
                     "status": "Success",
                     "student_name": student_name,
                     "writing_score": writing_score,
                     "reading_score": getattr(reading_result, 'score', ''),
-                    "qr_score": getattr(qrar_result, 'score', ''),
-                    "ar_score": '',
+                    "qr_score": getattr(qr_result, 'score', '') if qr_result else '',
+                    "ar_score": getattr(ar_result, 'score', '') if ar_result else '',
                     "notes": '',
                     "artifacts": artifacts,
                 }

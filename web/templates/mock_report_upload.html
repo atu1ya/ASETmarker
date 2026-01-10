@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+  {% include 'components/flash.html' %}
+  
+  <h2>Free Mock Report Generator</h2>
+  <p class="subtitle">Upload a CSV file containing student scores to generate individual performance reports and email templates.</p>
+  
+  <div class="card">
+    <h3>CSV Format Requirements</h3>
+    <p>Your CSV file must include the following columns:</p>
+    <ul>
+      <li><strong>Student Name</strong> - Full name of the student</li>
+      <li><strong>Reading Score</strong> - Score out of 35</li>
+      <li><strong>Writing Score</strong> - Score out of 20</li>
+      <li><strong>QR Score</strong> - Quantitative Reasoning score out of 35</li>
+      <li><strong>AR Score</strong> - Abstract Reasoning score out of 35</li>
+      <li><strong>Total Standard Score</strong> - Total score out of 125</li>
+    </ul>
+    <p class="help-text">Column names are case-insensitive. The system will automatically detect variations.</p>
+  </div>
+
+  <form method="post" action="/mock-report/generate" enctype="multipart/form-data" class="upload-form">
+    <div class="form-group">
+      <label for="csv-file">Upload CSV File:</label>
+      <input type="file" id="csv-file" name="csv_file" accept=".csv" required class="input">
+      <p class="help-text">Maximum file size: 10 MB</p>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="button">Generate Reports</button>
+      <a href="/dashboard" class="button is-secondary">Cancel</a>
+    </div>
+  </form>
+
+  <div class="info-section">
+    <h3>What You'll Receive</h3>
+    <p>After processing, you'll download a ZIP file containing:</p>
+    <ul>
+      <li><strong>PDF Reports</strong> - Individual performance reports for each student with:
+        <ul>
+          <li>Detailed score breakdown by section</li>
+          <li>Visual performance charts</li>
+          <li>Personalized analysis and recommendations</li>
+          <li>Next steps for improvement</li>
+        </ul>
+      </li>
+      <li><strong>Email Templates</strong> - Pre-written email drafts for each student that you can send directly</li>
+    </ul>
+  </div>
+</div>
+
+<style>
+.container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.subtitle {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.card {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.card h3 {
+  margin-top: 0;
+  color: #2c3e50;
+}
+
+.card ul {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.card li {
+  margin: 0.5rem 0;
+}
+
+.upload-form {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+}
+
+.help-text {
+  font-size: 0.875rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.info-section {
+  background: #e8f4f8;
+  border-left: 4px solid #3498db;
+  padding: 1.5rem;
+  border-radius: 4px;
+}
+
+.info-section h3 {
+  margin-top: 0;
+  color: #2c3e50;
+}
+
+.info-section ul {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.info-section li {
+  margin: 0.5rem 0;
+}
+
+.is-secondary {
+  background-color: #6c757d;
+}
+
+.is-secondary:hover {
+  background-color: #5a6268;
+}
+</style>
+{% endblock %}

@@ -120,10 +120,13 @@ async def process_single_student(
     marking_service = MarkingService(settings.CONFIG_DIR)
     reading_result = None
     qrar_result = None
+    qr_result = None
+    ar_result = None
     
     try:
         if reading_bytes:
-            reading_key = {str(i+1): ans for i, ans in enumerate(config.reading_answers)}
+            # Use RC prefix for reading questions (RC1, RC2, ...)
+            reading_key = {f"RC{i+1}": ans for i, ans in enumerate(config.reading_answers)}
             reading_result = marking_service.process_single_subject(
                 subject_name="Reading",
                 image_bytes=reading_bytes,
@@ -132,15 +135,53 @@ async def process_single_student(
             )
         
         if qrar_bytes:
-            # Combine QR and AR answers for the combined sheet
-            combined_answers = config.qr_answers + config.ar_answers
-            qrar_key = {str(i+1): ans for i, ans in enumerate(combined_answers)}
+            # Build QR/AR key with correct prefixes
+            # QR questions: QR1, QR2, ... QRn
+            # AR questions: AR1, AR2, ... ARm (restarts at 1)
+            qrar_key = {}
+            for i, ans in enumerate(config.qr_answers):
+                qrar_key[f"QR{i+1}"] = ans
+            for i, ans in enumerate(config.ar_answers):
+                qrar_key[f"AR{i+1}"] = ans
             qrar_result = marking_service.process_single_subject(
                 subject_name="QR/AR",
                 image_bytes=qrar_bytes,
                 answer_key=qrar_key,
                 template_filename="aset_qrar_template.json",
             )
+            # --- Split QR/AR into separate SubjectResults ---
+            from copy import deepcopy
+            from web.services.marker import SubjectResult
+            qr_len = len(config.qr_answers)
+            ar_len = len(config.ar_answers)
+            # Defensive: ensure qrar_result exists and has results
+            if qrar_result and hasattr(qrar_result, 'results'):
+                qr_results = qrar_result.results[:qr_len]
+                ar_results = qrar_result.results[qr_len:qr_len+ar_len]
+                # Recalculate scores
+                qr_score = sum(1 for q in qr_results if getattr(q, 'is_correct', False))
+                ar_score = sum(1 for q in ar_results if getattr(q, 'is_correct', False))
+                # Build new SubjectResult objects
+                qr_result = SubjectResult(
+                    subject_name="Quantitative Reasoning",
+                    score=qr_score,
+                    total_questions=qr_len,
+                    results=qr_results,
+                    omr_response=qrar_result.omr_response,
+                    marked_image=qrar_result.marked_image,
+                    template=qrar_result.template,
+                    clean_image=getattr(qrar_result, 'clean_image', None)
+                )
+                ar_result = SubjectResult(
+                    subject_name="Abstract Reasoning",
+                    score=ar_score,
+                    total_questions=ar_len,
+                    results=ar_results,
+                    omr_response=qrar_result.omr_response,
+                    marked_image=qrar_result.marked_image,
+                    template=qrar_result.template,
+                    clean_image=getattr(qrar_result, 'clean_image', None)
+                )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -165,12 +206,13 @@ async def process_single_student(
             bundle.writestr(f"{folder_name}_QRAR_Marked.pdf", qrar_pdf)
         
         # Generate report and analysis only if requested, both files provided, and concept mapping exists
-        if generate_report and reading_result and qrar_result and config.has_concept_mapping:
+        # --- Use split QR/AR results for analysis ---
+        if generate_report and reading_result and qr_result and ar_result and config.has_concept_mapping:
             analysis_service = AnalysisService(config.concept_mapping)
             full_analysis = analysis_service.generate_full_analysis(
                 reading_result,
-                qrar_result,
-                empty_ar,
+                qr_result,
+                ar_result,
             )
             report_service = ReportService()
             report_pdf = report_service.generate_student_report(full_analysis, student_name)

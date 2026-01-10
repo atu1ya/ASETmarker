@@ -49,13 +49,13 @@ class AnnotatorService:
         
         return score, total
 
-    def _build_bubble_index(self, template) -> Dict[Tuple[str, str], Tuple[Any, Any]]:
+    def _build_bubble_index(self, template) -> Dict[str, Tuple[Any, Any]]:
         """
         Build a fast lookup dictionary from template.
-        Key: (field_label_lower, field_value_upper)
+        Key: "LABEL_VALUE" (e.g., "RC1_A")
         Value: (bubble, field_block)
         
-        This ensures case-insensitive lookup for both label and value.
+        This ensures string-based lookup to avoid type mismatches.
         """
         bubble_index = {}
         
@@ -65,10 +65,10 @@ class AnnotatorService:
         for field_block in template.field_blocks:
             for field_block_bubbles in field_block.traverse_bubbles:
                 for bubble in field_block_bubbles:
-                    # Create case-normalized key
-                    label_key = str(bubble.field_label).lower()
-                    value_key = str(bubble.field_value).upper()
-                    key = (label_key, value_key)
+                    # Create normalized string key: "LABEL_VALUE"
+                    label_key = str(bubble.field_label).strip().upper()
+                    value_key = str(bubble.field_value).strip().upper()
+                    key = f"{label_key}_{value_key}"
                     bubble_index[key] = (bubble, field_block)
         
         return bubble_index
@@ -81,7 +81,7 @@ class AnnotatorService:
         
         Returns the annotated image as np.ndarray.
         """
-        # Use clean_image if available (SubjectResult), otherwise fall back to marked_image
+        # 1. Use the CLEAN image (no grey boxes)
         if hasattr(result, 'clean_image') and result.clean_image is not None:
             img = result.clean_image.copy()
         elif result.marked_image is not None:
@@ -89,59 +89,49 @@ class AnnotatorService:
         else:
             raise ValueError("No image found in result.")
         
-        # Step A: Convert to BGR immediately for color annotation
+        # 2. Convert to Color (BGR) so we can draw RED
         if len(img.shape) == 2:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         elif len(img.shape) == 3 and img.shape[2] == 1:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         
+        # 3. Get template and build bubble lookup
         template = getattr(result, 'template', None)
-        
-        # Step B: Build bubble index for fast lookup
         bubble_index = self._build_bubble_index(template)
         
         questions = self._get_questions(result)
         
-        print(f"[ANNOTATOR DEBUG] Starting annotation for {len(questions)} questions")
-        print(f"[ANNOTATOR DEBUG] Image shape: {img.shape}, Template: {template.path.name if template else 'None'}")
+        print(f"[ANNOTATOR] Annotating subject, Questions: {len(questions)}")
+        print(f"[ANNOTATOR] Image shape: {img.shape}, Template: {template.path.name if template else 'None'}")
+        print(f"[ANNOTATOR] Bubble index has {len(bubble_index)} entries")
         
-        # Step C: Draw feedback for incorrect answers
+        # 4. Draw Red Boxes for INCORRECT answers
         for question in questions:
             if question.is_correct:
                 # Correct answer: no annotation needed
                 continue
             
-            # Construct lookup key: (label_lower, value_upper)
-            label_key = str(question.label).lower()
-            value_key = str(question.correct_value).upper()
-            lookup_key = (label_key, value_key)
+            # We want to highlight the CORRECT answer
+            correct_val = str(question.correct_value).strip().upper()
+            label = str(question.label).strip().upper()
+            lookup_key = f"{label}_{correct_val}"
             
-            print(f"[ANNOTATOR DEBUG] Processing incorrect question: {question.label}, correct={question.correct_value}, lookup_key={lookup_key}")
+            print(f"[ANNOTATOR] Processing incorrect: {question.label}, correct={question.correct_value}, key={lookup_key}")
             
-            # Retrieve bubble and field_block from index
-            bubble_data = bubble_index.get(lookup_key)
-            
-            if bubble_data:
-                bubble, field_block = bubble_data
+            if lookup_key in bubble_index:
+                bubble, block = bubble_index[lookup_key]
                 
-                # Calculate coordinates with alignment shift
-                x = bubble.x + field_block.shift
-                y = bubble.y
-                box_w, box_h = field_block.bubble_dimensions
+                # Calculate Coordinates with SHIFT
+                x = int(bubble.x + block.shift)
+                y = int(bubble.y)
+                w, h = block.bubble_dimensions
                 
-                print(f"[ANNOTATOR DEBUG] Drawing red rectangle at x={x}, y={y}, w={box_w}, h={box_h}, shift={field_block.shift}")
+                print(f"[ANNOTATOR] Drawing red rectangle at x={x}, y={y}, w={w}, h={h}, shift={block.shift}")
                 
-                # Draw red rectangle around the correct answer
-                # Using a thick border (thickness=3) for visibility
-                cv2.rectangle(
-                    img,
-                    (int(x + box_w / 12), int(y + box_h / 12)),
-                    (int(x + box_w - box_w / 12), int(y + box_h - box_h / 12)),
-                    CLR_RED,
-                    3
-                )
+                # Draw Red Rectangle (BGR: 0, 0, 255)
+                cv2.rectangle(img, (x, y), (x + w, y + h), CLR_RED, 2)
             else:
-                print(f"[ANNOTATOR DEBUG] WARNING: No bubble data found for {lookup_key}")
+                print(f"[ANNOTATOR] WARNING: Could not find bubble for {lookup_key}")
         
         # Add score overlay
         img = self._add_score_overlay(img, result)
