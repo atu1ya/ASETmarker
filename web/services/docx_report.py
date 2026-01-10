@@ -61,12 +61,51 @@ DEFAULT_QR_CONCEPTS = [
 MASTERY_THRESHOLD = 51.0
 
 
+def _load_concept_question_mapping() -> Dict[str, Dict[str, str]]:
+    """Load concept to question numbers mapping from config file.
+    
+    Returns:
+        Dict with structure: {'Reading': {'concept_name': 'q1, q2, q3'}, 'Quantitative Reasoning': {...}}
+    """
+    import json
+    
+    # Try to load from sample_concept_mapping.json
+    config_path = Path(__file__).parent.parent.parent / "docs" / "sample_concept_mapping.json"
+    
+    try:
+        if config_path.exists():
+            with open(config_path, 'r') as f:
+                raw_mapping = json.load(f)
+            
+            # Convert list of question IDs to comma-separated string
+            result = {}
+            for subject in ['Reading', 'Quantitative Reasoning']:
+                if subject in raw_mapping:
+                    result[subject] = {}
+                    for concept_name, question_list in raw_mapping[subject].items():
+                        # Remove 'q' or 'qr' prefix and join with commas
+                        clean_nums = [q.replace('q', '').replace('r', '') for q in question_list]
+                        result[subject][concept_name] = ', '.join(clean_nums)
+            
+            return result
+    except Exception as e:
+        logger.warning(f"Could not load concept mapping: {e}")
+    
+    # Fallback: empty mapping
+    return {'Reading': {}, 'Quantitative Reasoning': {}}
+
+
+# Load question number mapping at module level
+CONCEPT_QUESTION_MAPPING = _load_concept_question_mapping()
+
+
 @dataclass
 class ConceptMastery:
     """Represents mastery status for a single concept."""
     name: str
     done_well: str
     improve: str
+    questions: str = ""
     
     def to_dict(self) -> Dict[str, str]:
         """Convert to dictionary for template context."""
@@ -74,6 +113,7 @@ class ConceptMastery:
             "name": self.name,
             "done_well": self.done_well,
             "improve": self.improve,
+            "questions": self.questions,
         }
 
 
@@ -324,57 +364,66 @@ class DocxReportGenerator:
     def _build_concept_mastery_list(
         self,
         default_concept_names: List[str],
+        subject_name: str,
         area_results: Optional[List[LearningAreaResult]] = None,
         flow_type: FlowType = FlowType.STANDARD,
-    ) -> List[Dict[str, str]]:
+    ) -> List[ConceptMastery]:
         """
-        Build concept mastery list with tick marks.
+        Build concept mastery list in default order with tick marks and question numbers.
         
-        When area_results is provided (standard/batch flow with analysis), the
-        concept names are extracted directly from the LearningAreaResult objects.
-        When area_results is None (mock flow or no analysis), uses default_concept_names.
+        Always iterates through default_concept_names to ensure the output list order
+        strictly matches the default list. For each concept, finds the matching
+        LearningAreaResult (if available) and calculates mastery accordingly.
         
         Args:
-            default_concept_names: Fallback list of concept names (used when no area_results)
+            default_concept_names: List of concept names in the desired order
+            subject_name: Subject name for question number lookup (e.g., 'Reading', 'Quantitative Reasoning')
             area_results: Optional list of LearningAreaResult objects with mastery data
             flow_type: The flow type (affects mastery calculation)
             
         Returns:
-            List of dictionaries with name, done_well, and improve keys
+            List of ConceptMastery objects in the order of default_concept_names
         """
         concepts = []
+        question_map = CONCEPT_QUESTION_MAPPING.get(subject_name, {})
         
-        if flow_type == FlowType.MOCK:
-            # Mock flow: use default concept names with empty checkmarks
-            for concept_name in default_concept_names:
-                concepts.append({
-                    "name": concept_name,
-                    "done_well": "",
-                    "improve": "",
-                })
-        elif area_results:
-            # Standard/Batch flow WITH analysis: use actual concept names from results
+        # Create a lookup dict for area_results by concept name
+        results_by_name = {}
+        if area_results:
             for result in area_results:
+                results_by_name[result.area] = result
+        
+        # Always iterate through default_concept_names to maintain strict order
+        for concept_name in default_concept_names:
+            # Look up question numbers from mapping
+            questions = question_map.get(concept_name, '')
+            
+            # Find matching result if available
+            result = results_by_name.get(concept_name)
+            
+            if flow_type == FlowType.MOCK:
+                # Mock flow: empty checkmarks
+                done_well = ""
+                improve = ""
+            elif result:
+                # Standard/Batch flow WITH matching result: calculate based on mastery
                 if result.status == "Done well" or result.percentage >= MASTERY_THRESHOLD:
-                    concepts.append({
-                        "name": result.area,
-                        "done_well": "✓",
-                        "improve": "",
-                    })
+                    done_well = "✓"
+                    improve = ""
                 else:
-                    concepts.append({
-                        "name": result.area,
-                        "done_well": "",
-                        "improve": "✓",
-                    })
-        else:
-            # Standard/Batch flow WITHOUT analysis: use defaults with "needs improvement"
-            for concept_name in default_concept_names:
-                concepts.append({
-                    "name": concept_name,
-                    "done_well": "",
-                    "improve": "✓",
-                })
+                    done_well = ""
+                    improve = "✓"
+            else:
+                # Standard/Batch flow WITHOUT matching result: default to "needs improvement"
+                done_well = ""
+                improve = "✓"
+            
+            concepts.append(ConceptMastery(
+                name=concept_name,
+                done_well=done_well,
+                improve=improve,
+                questions=questions,
+            ))
         
         return concepts
     
@@ -418,13 +467,39 @@ class DocxReportGenerator:
         
         total_score = reading_correct + qr_correct + ar_correct + writing_score
         
-        # Build concept lists with mastery ticks
-        reading_concepts = self._build_concept_mastery_list(
-            DEFAULT_READING_CONCEPTS, reading_areas, flow_type
+        # Build concept lists with mastery ticks and question numbers
+        reading_concepts_objs = self._build_concept_mastery_list(
+            DEFAULT_READING_CONCEPTS, 'Reading', reading_areas, flow_type
         )
-        qr_concepts = self._build_concept_mastery_list(
-            DEFAULT_QR_CONCEPTS, qr_areas, flow_type
+        qr_concepts_objs = self._build_concept_mastery_list(
+            DEFAULT_QR_CONCEPTS, 'Quantitative Reasoning', qr_areas, flow_type
         )
+        
+        # Convert to dicts with all fields including aliases
+        reading_concepts = [
+            {
+                "name": c.name,
+                "questions": c.questions,
+                "question_numbers": c.questions,  # Alias
+                "done_well": c.done_well,
+                "improve": c.improve,
+                "done_well_tick": c.done_well,  # Alias
+                "room_improve_tick": c.improve,  # Alias
+            }
+            for c in reading_concepts_objs
+        ]
+        qr_concepts = [
+            {
+                "name": c.name,
+                "questions": c.questions,
+                "question_numbers": c.questions,  # Alias
+                "done_well": c.done_well,
+                "improve": c.improve,
+                "done_well_tick": c.done_well,  # Alias
+                "room_improve_tick": c.improve,  # Alias
+            }
+            for c in qr_concepts_objs
+        ]
         
         return {
             "student_name": student_name,
@@ -502,16 +577,40 @@ class DocxReportGenerator:
             reading_concepts = student_data['reading_concepts']
         else:
             # For mock flow, or if no analysis data is provided, use empty mastery
-            reading_concepts = self._build_concept_mastery_list(
-                DEFAULT_READING_CONCEPTS, None, flow_type
+            reading_concepts_objs = self._build_concept_mastery_list(
+                DEFAULT_READING_CONCEPTS, 'Reading', None, flow_type
             )
+            reading_concepts = [
+                {
+                    "name": c.name,
+                    "questions": c.questions,
+                    "question_numbers": c.questions,  # Alias
+                    "done_well": c.done_well,
+                    "improve": c.improve,
+                    "done_well_tick": c.done_well,  # Alias
+                    "room_improve_tick": c.improve,  # Alias
+                }
+                for c in reading_concepts_objs
+            ]
         
         if 'qr_concepts' in student_data and isinstance(student_data['qr_concepts'], list):
             qr_concepts = student_data['qr_concepts']
         else:
-            qr_concepts = self._build_concept_mastery_list(
-                DEFAULT_QR_CONCEPTS, None, flow_type
+            qr_concepts_objs = self._build_concept_mastery_list(
+                DEFAULT_QR_CONCEPTS, 'Quantitative Reasoning', None, flow_type
             )
+            qr_concepts = [
+                {
+                    "name": c.name,
+                    "questions": c.questions,
+                    "question_numbers": c.questions,  # Alias
+                    "done_well": c.done_well,
+                    "improve": c.improve,
+                    "done_well_tick": c.done_well,  # Alias
+                    "room_improve_tick": c.improve,  # Alias
+                }
+                for c in qr_concepts_objs
+            ]
         
         return {
             "student_name": student_name,
@@ -624,8 +723,15 @@ class DocxReportGenerator:
         doc.render(context)
         
         # Disable autofit for all tables to prevent automatic cell width adjustments
+        # and stabilize the 4-column concept tables
         for table in doc.tables:
             table.autofit = False
+            # Set preferred width if available
+            try:
+                if hasattr(table, 'width'):
+                    table.width = Inches(6.5)  # Standard page width minus margins
+            except:
+                pass
         
         # Save to buffer
         output_buffer = io.BytesIO()

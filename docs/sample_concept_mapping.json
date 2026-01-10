@@ -4,24 +4,27 @@
     "_format": "Each question should appear in exactly ONE area per subject",
 
     "Reading": {
-        "Main Idea & Theme": ["q1", "q6", "q11", "q16", "q21", "q26"],
-        "Inference & Interpretation": ["q2", "q7", "q12", "q17", "q22", "q27"],
-        "Vocabulary in Context": ["q3", "q8", "q13", "q18", "q23", "q28"],
-        "Author's Purpose & Tone": ["q4", "q9", "q14", "q19", "q24", "q29"],
-        "Text Structure & Features": ["q5", "q10", "q15", "q20", "q25", "q30"]
+        "Understanding main ideas": ["rc1", "rc9", "rc17", "rc25"],
+        "Inference and deduction": ["rc2", "rc10", "rc18", "rc26"],
+        "Identifying key details": ["rc3", "rc11", "rc19", "rc27"],
+        "Vocabulary context clues": ["rc4", "rc12", "rc20", "rc28"],
+        "Author's purpose and tone": ["rc5", "rc13", "rc21", "rc29"],
+        "Cause and effect relationships": ["rc6", "rc14", "rc22", "rc30"],
+        "Understanding tone and attitude": ["rc7", "rc15", "rc23", "rc31"],
+        "Figurative / Literary devices": ["rc8", "rc16", "rc24", "rc32", "rc33", "rc34", "rc35"]
     },
 
     "Quantitative Reasoning": {
-        "Number & Operations": ["qr1", "qr2", "qr3", "qr4", "qr5"],
-        "Algebra & Patterns": ["qr6", "qr7", "qr8", "qr9", "qr10"],
-        "Measurement": ["qr11", "qr12", "qr13", "qr14", "qr15"],
-        "Geometry & Spatial Sense": ["qr16", "qr17", "qr18", "qr19", "qr20"],
-        "Statistics & Probability": ["qr21", "qr22", "qr23", "qr24", "qr25"]
-    },
-
-    "Abstract Reasoning": {
-        "Pattern Recognition": ["ar1", "ar2", "ar3", "ar4", "ar5", "ar6", "ar7"],
-        "Spatial Reasoning": ["ar8", "ar9", "ar10", "ar11", "ar12", "ar13"],
-        "Logical Sequences": ["ar14", "ar15", "ar16", "ar17", "ar18", "ar19", "ar20"]
+        "Fractions / Decimals": ["qr1", "qr12", "qr23", "qr34"],
+        "Time": ["qr2", "qr13", "qr24"],
+        "Algebra": ["qr3", "qr14", "qr25"],
+        "Geometry": ["qr4", "qr15", "qr26"],
+        "Graph / Data Interpretation": ["qr5", "qr16", "qr27"],
+        "Multiplication / Division": ["qr6", "qr17", "qr28"],
+        "Area / Perimeter": ["qr7", "qr18", "qr29"],
+        "Ratios / Unit Conversions": ["qr8", "qr19", "qr30"],
+        "Probability": ["qr9", "qr20", "qr31"],
+        "Patterns / Sequences": ["qr10", "qr21", "qr32"],
+        "Percentages": ["qr11", "qr22", "qr33", "qr35"]
     }
 }

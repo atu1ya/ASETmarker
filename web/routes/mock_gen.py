@@ -87,10 +87,6 @@ async def generate_mock_reports(
                 )
                 safe_name = student['name'].replace(' ', '_')
                 bundle.writestr(f"{safe_name}_Report.docx", docx_bytes)
-                
-                # Generate email template (keep existing text generation)
-                email_text = mock_service.generate_email_template(student)
-                bundle.writestr(f"{safe_name}_Email.txt", email_text.encode('utf-8'))
         
         zip_buffer.seek(0)
         filename = "Mock_Reports.zip"
