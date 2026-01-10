@@ -496,13 +496,22 @@ class DocxReportGenerator:
         qr_percentage = (qr_score / qr_total * 100) if qr_total > 0 else 0
         ar_percentage = (ar_score / ar_total * 100) if ar_total > 0 else 0
         
-        # For mock flow, or if no analysis data is provided, use empty mastery
-        reading_concepts = self._build_concept_mastery_list(
-            DEFAULT_READING_CONCEPTS, None, flow_type
-        )
-        qr_concepts = self._build_concept_mastery_list(
-            DEFAULT_QR_CONCEPTS, None, flow_type
-        )
+        # Check if concept data is provided in student_data
+        # If provided, use it directly; otherwise fall back to defaults
+        if 'reading_concepts' in student_data and isinstance(student_data['reading_concepts'], list):
+            reading_concepts = student_data['reading_concepts']
+        else:
+            # For mock flow, or if no analysis data is provided, use empty mastery
+            reading_concepts = self._build_concept_mastery_list(
+                DEFAULT_READING_CONCEPTS, None, flow_type
+            )
+        
+        if 'qr_concepts' in student_data and isinstance(student_data['qr_concepts'], list):
+            qr_concepts = student_data['qr_concepts']
+        else:
+            qr_concepts = self._build_concept_mastery_list(
+                DEFAULT_QR_CONCEPTS, None, flow_type
+            )
         
         return {
             "student_name": student_name,
@@ -613,6 +622,10 @@ class DocxReportGenerator:
         
         # Render the template
         doc.render(context)
+        
+        # Disable autofit for all tables to prevent automatic cell width adjustments
+        for table in doc.tables:
+            table.autofit = False
         
         # Save to buffer
         output_buffer = io.BytesIO()
