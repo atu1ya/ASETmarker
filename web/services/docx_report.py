@@ -163,8 +163,9 @@ class DocxReportGenerator:
         "student_name": "John Smith",
         "total_score": 85.00,
         "writing_score": 25.00,
+        "graph_image": <InlineImage>,  # Bar chart as inline image
         
-        "reading": {
+        "rc": {
             "score": 28.00,
             "total": 35.00,
             "percentage": 80.00,
@@ -188,9 +189,8 @@ class DocxReportGenerator:
             "percentage": 77.14
         },
         
-        "graph_image": <InlineImage>,  # Bar chart as inline image
-        
-        # Flat versions for backward compatibility
+        # Backward compatibility aliases
+        "reading": {...},  # Same as 'rc'
         "reading_score": 28.00,
         "qr_score": 30.00,
         "ar_score": 27.00,
@@ -204,18 +204,20 @@ class DocxReportGenerator:
     Use Jinja2 syntax within the Word template:
     
     - Simple values: {{ student_name }}, {{ total_score }}
-    - Nested values: {{ reading.score }}, {{ reading.percentage }}
+    - Nested values: {{ rc.score }}, {{ rc.percentage }}, {{ qr.score }}
     - Inline image: {{ graph_image }}
     
     - Concept table loop:
-        {% for c in reading.concepts %}
+        {% for c in rc.concepts %}
         {{ c.name }} | {{ c.done_well }} | {{ c.improve }}
         {% endfor %}
     
     - Conditional display:
-        {% if reading.percentage >= 51 %}Passed{% else %}Needs work{% endif %}
+        {% if rc.percentage >= 51 %}Passed{% else %}Needs work{% endif %}
     
     Notes:
+    - Primary keys are 'rc' (Reading Comprehension), 'qr', and 'ar'
+    - 'reading' is provided as an alias for backward compatibility
     - All numeric values are rounded to 2 decimal places
     - Checkmarks use Unicode "✓" character
     - Mock flow leaves all checkmark columns blank
@@ -437,27 +439,33 @@ class DocxReportGenerator:
             "student_name": student_name,
             "total_score": round(total_score, 2),
             "writing_score": round(writing_score, 2),
-            # Nested reading structure
-            "reading": {
+            # Reading Comprehension structure (key: 'rc')
+            "rc": {
                 "score": round(reading_correct, 2),
                 "total": round(reading_total, 2),
                 "percentage": round(reading_percentage, 2),
                 "concepts": reading_concepts,
             },
-            # Nested qr structure
+            # Quantitative Reasoning structure (key: 'qr')
             "qr": {
                 "score": round(qr_correct, 2),
                 "total": round(qr_total, 2),
                 "percentage": round(qr_percentage, 2),
                 "concepts": qr_concepts,
             },
-            # Nested ar structure
+            # Abstract Reasoning structure (key: 'ar')
             "ar": {
                 "score": round(ar_correct, 2),
                 "total": round(ar_total, 2),
                 "percentage": round(ar_percentage, 2),
             },
-            # Keep flat versions for backward compatibility
+            # Backward compatibility aliases
+            "reading": {
+                "score": round(reading_correct, 2),
+                "total": round(reading_total, 2),
+                "percentage": round(reading_percentage, 2),
+                "concepts": reading_concepts,
+            },
             "reading_score": round(reading_correct, 2),
             "qr_score": round(qr_correct, 2),
             "ar_score": round(ar_correct, 2),
@@ -509,27 +517,33 @@ class DocxReportGenerator:
             "student_name": student_name,
             "total_score": round(total_score, 2),
             "writing_score": round(writing_score, 2),
-            # Nested reading structure
-            "reading": {
+            # Reading Comprehension structure (key: 'rc')
+            "rc": {
                 "score": round(reading_score, 2),
                 "total": round(reading_total, 2),
                 "percentage": round(reading_percentage, 2),
                 "concepts": reading_concepts,
             },
-            # Nested qr structure
+            # Quantitative Reasoning structure (key: 'qr')
             "qr": {
                 "score": round(qr_score, 2),
                 "total": round(qr_total, 2),
                 "percentage": round(qr_percentage, 2),
                 "concepts": qr_concepts,
             },
-            # Nested ar structure
+            # Abstract Reasoning structure (key: 'ar')
             "ar": {
                 "score": round(ar_score, 2),
                 "total": round(ar_total, 2),
                 "percentage": round(ar_percentage, 2),
             },
-            # Keep flat versions for backward compatibility
+            # Backward compatibility aliases
+            "reading": {
+                "score": round(reading_score, 2),
+                "total": round(reading_total, 2),
+                "percentage": round(reading_percentage, 2),
+                "concepts": reading_concepts,
+            },
             "reading_score": round(reading_score, 2),
             "qr_score": round(qr_score, 2),
             "ar_score": round(ar_score, 2),

@@ -284,14 +284,20 @@ class TestBuildContext:
         assert context["writing_score"] == 95.0
         assert context["total_score"] == 375.0
         
-        # Check nested structure
-        assert "reading" in context
+        # Check nested structure with PRIMARY keys (rc, qr, ar)
+        assert "rc" in context
         assert "qr" in context
         assert "ar" in context
         
-        assert context["reading"]["score"] == 100.0
+        # Check backward compatibility alias
+        assert "reading" in context
+        
+        assert context["rc"]["score"] == 100.0
         assert context["qr"]["score"] == 88.0
         assert context["ar"]["score"] == 92.0
+        
+        # Verify 'reading' alias matches 'rc'
+        assert context["reading"]["score"] == context["rc"]["score"]
         
         # Check backward compatibility flat keys
         assert context["reading_score"] == 100.0
@@ -299,7 +305,7 @@ class TestBuildContext:
         assert context["ar_score"] == 92.0
         
         # Mock flow: all concepts should have empty checkmarks
-        for concept in context["reading"]["concepts"]:
+        for concept in context["rc"]["concepts"]:
             assert concept["done_well"] == ""
             assert concept["improve"] == ""
         
@@ -335,21 +341,29 @@ class TestBuildContext:
         assert context["student_name"] == "Analysis Student"
         assert context["writing_score"] == 85.0
         
-        # Check nested structure exists
-        assert "reading" in context
+        # Check nested structure exists with PRIMARY keys (rc, qr, ar)
+        assert "rc" in context
         assert "qr" in context
         assert "ar" in context
         
-        # Check reading nested structure
-        assert context["reading"]["score"] == 8  # 5 + 3
-        assert context["reading"]["total"] == 14  # 6 + 8
-        assert "concepts" in context["reading"]
+        # Check backward compatibility alias
+        assert "reading" in context
+        
+        # Check rc nested structure
+        assert context["rc"]["score"] == 8  # 5 + 3
+        assert context["rc"]["total"] == 14  # 6 + 8
+        assert "concepts" in context["rc"]
         # Concepts should match the actual analysis results, not hardcoded defaults
-        assert len(context["reading"]["concepts"]) == 2
-        assert context["reading"]["concepts"][0]["name"] == "Understanding main ideas"
-        assert context["reading"]["concepts"][0]["done_well"] == "✓"
-        assert context["reading"]["concepts"][1]["name"] == "Inference and deduction"
-        assert context["reading"]["concepts"][1]["improve"] == "✓"
+        assert len(context["rc"]["concepts"]) == 2
+        assert context["rc"]["concepts"][0]["name"] == "Understanding main ideas"
+        assert context["rc"]["concepts"][0]["done_well"] == "✓"
+        assert context["rc"]["concepts"][1]["name"] == "Inference and deduction"
+        assert context["rc"]["concepts"][1]["improve"] == "✓"
+        
+        # Verify 'reading' alias matches 'rc'
+        assert context["reading"]["score"] == context["rc"]["score"]
+        assert context["reading"]["total"] == context["rc"]["total"]
+        assert len(context["reading"]["concepts"]) == len(context["rc"]["concepts"])
         
         # Check qr nested structure
         assert context["qr"]["score"] == 4
@@ -460,12 +474,21 @@ class TestGenerateReport:
             
             context = generator._build_context_from_dict(student_data, FlowType.STANDARD)
             
-            # Verify nested structure keys exist
-            assert "reading" in context
+            # Verify PRIMARY nested structure keys exist (rc, qr, ar)
+            assert "rc" in context
             assert "qr" in context
             assert "ar" in context
             
-            # Verify nested reading structure
+            # Verify backward compatibility alias
+            assert "reading" in context
+            
+            # Verify nested rc structure
+            assert "score" in context["rc"]
+            assert "total" in context["rc"]
+            assert "percentage" in context["rc"]
+            assert "concepts" in context["rc"]
+            
+            # Verify nested reading alias structure
             assert "score" in context["reading"]
             assert "total" in context["reading"]
             assert "percentage" in context["reading"]
@@ -497,9 +520,9 @@ class TestGenerateReport:
             for key in required_flat_keys:
                 assert key in context, f"Missing required key: {key}"
             
-            # Verify concept structure in nested reading
-            if context["reading"]["concepts"]:
-                concept = context["reading"]["concepts"][0]
+            # Verify concept structure in nested rc
+            if context["rc"]["concepts"]:
+                concept = context["rc"]["concepts"][0]
                 assert "name" in concept
                 assert "done_well" in concept
                 assert "improve" in concept
