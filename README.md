@@ -164,6 +164,216 @@ See `CONTRIBUTING.md` for additional project conventions.
 
 ---
 
+## Deployment & Handover
+
+This section covers production deployment to **Azure Web App for Containers** with automated CI/CD via GitHub Actions.
+
+### Prerequisites
+
+Before deployment, ensure you have:
+
+- An **Azure subscription** with appropriate permissions
+- **Azure CLI** installed and authenticated (`az login`)
+- A **GitHub repository** with this codebase
+- Administrative access to configure **GitHub Secrets**
+
+### Azure Resource Setup
+
+#### 1. Create an Azure Container Registry (ACR)
+
+```bash
+# Set variables
+RESOURCE_GROUP="asetmarker-rg"
+LOCATION="eastus"
+ACR_NAME="asetmarkeracr"  # Must be globally unique, lowercase alphanumeric only
+
+# Create resource group
+az group create --name $RESOURCE_GROUP --location $LOCATION
+
+# Create container registry
+az acr create --resource-group $RESOURCE_GROUP \
+  --name $ACR_NAME \
+  --sku Basic \
+  --admin-enabled true
+```
+
+#### 2. Create an Azure Web App for Containers
+
+```bash
+# Set variables
+APP_SERVICE_PLAN="asetmarker-plan"
+WEBAPP_NAME="asetmarker-webapp"  # Must be globally unique
+
+# Create App Service Plan (Linux)
+az appservice plan create --name $APP_SERVICE_PLAN \
+  --resource-group $RESOURCE_GROUP \
+  --is-linux \
+  --sku B1
+
+# Create Web App
+az webapp create --resource-group $RESOURCE_GROUP \
+  --plan $APP_SERVICE_PLAN \
+  --name $WEBAPP_NAME \
+  --deployment-container-image-name $ACR_NAME.azurecr.io/asetmarker:latest
+```
+
+#### 3. Configure Web App Environment Variables
+
+The application requires several environment variables from `web/config.py`:
+
+```bash
+# Configure application settings
+az webapp config appsettings set --resource-group $RESOURCE_GROUP \
+  --name $WEBAPP_NAME \
+  --settings \
+    SECRET_KEY="<generate-a-secure-random-key>" \
+    STAFF_PASSWORD="<your-production-password>" \
+    DEBUG="False" \
+    SESSION_DURATION_HOURS="8" \
+    MAX_UPLOAD_SIZE_MB="50" \
+    PORT="8000"
+```
+
+**Required Environment Variables:**
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `SECRET_KEY` | Session signing key (use strong random string) | `openssl rand -hex 32` |
+| `STAFF_PASSWORD` | Shared authentication password | `YourSecurePassword123!` |
+| `DEBUG` | Enable debug mode (set to `False` in production) | `False` |
+| `SESSION_DURATION_HOURS` | Session lifetime in hours | `8` |
+| `MAX_UPLOAD_SIZE_MB` | Maximum file upload size | `50` |
+| `PORT` | Container port (Azure uses 8000 by default) | `8000` |
+
+**Optional Variables:**
+- `ALLOWED_EXTENSIONS`: List of allowed file extensions (defaults to `.png`, `.jpg`, `.jpeg`)
+
+#### 4. Configure Container Registry Connection
+
+```bash
+# Get ACR credentials
+ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query username -o tsv)
+ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query passwords[0].value -o tsv)
+ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --query loginServer -o tsv)
+
+# Configure Web App to use ACR
+az webapp config container set --name $WEBAPP_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --docker-custom-image-name $ACR_LOGIN_SERVER/asetmarker:latest \
+  --docker-registry-server-url https://$ACR_LOGIN_SERVER \
+  --docker-registry-server-user $ACR_USERNAME \
+  --docker-registry-server-password $ACR_PASSWORD
+```
+
+### GitHub Actions CI/CD Setup
+
+#### 1. Create Azure Service Principal
+
+```bash
+# Create service principal with Contributor role
+az ad sp create-for-rbac --name "asetmarker-github-actions" \
+  --role Contributor \
+  --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/$RESOURCE_GROUP \
+  --sdk-auth
+```
+
+Save the entire JSON output - you'll need it for GitHub Secrets.
+
+#### 2. Configure GitHub Secrets
+
+Navigate to your GitHub repository → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Add the following secrets:
+
+| Secret Name | Value | How to Obtain |
+|-------------|-------|---------------|
+| `AZURE_CREDENTIALS` | Full JSON output from service principal creation | From step 1 above |
+| `REGISTRY_LOGIN_SERVER` | ACR login server URL | `<acr-name>.azurecr.io` |
+| `REGISTRY_USERNAME` | ACR admin username | From ACR credentials |
+| `REGISTRY_PASSWORD` | ACR admin password | From ACR credentials |
+| `WEBAPP_NAME` | Azure Web App name | Your Web App name |
+
+#### 3. Trigger Deployment
+
+The GitHub Actions workflow (`.github/workflows/azure-deploy.yml`) automatically triggers on:
+- **Push to `main` branch**: Builds and deploys automatically
+- **Manual trigger**: Go to **Actions** → **Build and Deploy to Azure Web App** → **Run workflow**
+
+The workflow performs:
+1. Checks out the code
+2. Logs in to Azure using service principal credentials
+3. Builds the Docker image
+4. Pushes image to Azure Container Registry with tags `latest` and `<commit-sha>`
+5. Deploys the image to Azure Web App
+6. Logs out from Azure
+
+### Monitoring and Logs
+
+#### View Application Logs
+
+```bash
+# Stream live logs
+az webapp log tail --name $WEBAPP_NAME --resource-group $RESOURCE_GROUP
+
+# Download logs
+az webapp log download --name $WEBAPP_NAME --resource-group $RESOURCE_GROUP
+```
+
+#### Access the Application
+
+Your application will be available at:
+```
+https://<webapp-name>.azurewebsites.net
+```
+
+### Pre-Deployment Cleanup
+
+Before final handover, remove these files from the repository:
+
+- `zz left to do.md` - Internal notes
+- `milestones.md` - Development planning
+- `Prompts/` - Development prompts (optional, keep for documentation)
+- Any `.env` files - Never commit secrets
+- `__pycache__/` directories - Auto-generated (excluded via `.dockerignore`)
+
+These files are already excluded from the Docker build via `.dockerignore`.
+
+### Security Best Practices
+
+1. **Never commit secrets**: Use environment variables and GitHub Secrets
+2. **Rotate credentials**: Regularly update `SECRET_KEY` and `STAFF_PASSWORD`
+3. **Monitor access**: Review Azure Activity Logs for unauthorized access attempts
+4. **Enable HTTPS**: Azure Web Apps provide free SSL certificates
+5. **Resource tagging**: Tag Azure resources for cost tracking and management
+
+### Rollback Procedure
+
+If a deployment fails or introduces issues:
+
+```bash
+# List previous deployments
+az webapp deployment list --name $WEBAPP_NAME --resource-group $RESOURCE_GROUP
+
+# Redeploy a previous image by commit SHA
+az webapp config container set --name $WEBAPP_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --docker-custom-image-name $ACR_LOGIN_SERVER/asetmarker:<previous-commit-sha>
+```
+
+### Cost Optimization
+
+- **B1 Basic Plan**: ~$13/month, suitable for development/testing
+- **Production**: Consider upgrading to S1 Standard (~$70/month) for auto-scaling
+- **ACR Basic**: $5/month for up to 10GB storage
+
+### Support and Maintenance
+
+For ongoing support:
+1. Monitor application logs for errors
+2. Review Azure metrics for performance issues
+3. Keep dependencies updated (`pip list --outdated`)
+4. Regularly update base Docker image (`python:3.11-slim`)
+
+---
+
 ## License
 
 Released under the MIT License. See [LICENSE](LICENSE) for details.

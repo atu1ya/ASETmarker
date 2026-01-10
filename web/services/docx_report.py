@@ -171,7 +171,7 @@ class StudentReportData:
                     qr_concepts.append(concept)
         
         return cls(
-            student_name=data.get('student_name', data.get('name', 'Unknown Student')),
+            student_name=str(data.get('student_name', data.get('name', 'Unknown Student'))).title(),
             reading_score=float(data.get('reading_score', data.get('reading', 0))),
             writing_score=float(data.get('writing_score', data.get('writing', 0))),
             qr_score=float(data.get('qr_score', data.get('qr', 0))),
@@ -451,7 +451,7 @@ class DocxReportGenerator:
             Dictionary ready to be passed to docxtpl with nested subject structures
         """
         # Extract student info
-        student_name = student_data.get('name', student_data.get('student_name', 'Unknown'))
+        student_name = str(student_data.get('name', student_data.get('student_name', 'Unknown'))).title()
         writing_score = float(student_data.get('writing', student_data.get('writing_score', 0)))
         # Extract area results from analysis
         # Map full subject names to short codes
@@ -581,7 +581,7 @@ class DocxReportGenerator:
         Returns:
             Dictionary ready to be passed to docxtpl with nested subject structures
         """
-        student_name = student_data.get('name', student_data.get('student_name', 'Unknown'))
+        student_name = str(student_data.get('name', student_data.get('student_name', 'Unknown'))).title()
         reading_score = float(student_data.get('reading', student_data.get('reading_score', 0)))
         writing_score = float(student_data.get('writing', student_data.get('writing_score', 0)))
         qr_score = float(student_data.get('qr', student_data.get('qr_score', 0)))
@@ -789,3 +789,49 @@ class DocxReportGenerator:
         """
         buffer = self.generate_report(student_data, flow_type, analysis)
         return buffer.getvalue()
+    
+    def generate_chart_bytes(
+        self,
+        student_data: Dict[str, Any],
+        flow_type: str = "standard",
+        analysis: Optional[FullAnalysis] = None,
+    ) -> bytes:
+        """
+        Generate a performance chart and return as PNG bytes.
+        
+        Args:
+            student_data: Dictionary containing student information and scores
+            flow_type: One of 'mock', 'standard', or 'batch'
+            analysis: Optional FullAnalysis object for mastery calculation
+            
+        Returns:
+            Bytes of the generated PNG image
+        """
+        # Validate and normalize flow_type
+        try:
+            flow = FlowType(flow_type.lower())
+        except ValueError:
+            logger.warning(f"Unknown flow_type '{flow_type}', defaulting to 'standard'")
+            flow = FlowType.STANDARD
+        
+        # Build context to get scores
+        if analysis is not None:
+            context = self._build_context_from_analysis(analysis, student_data, flow)
+        else:
+            context = self._build_context_from_dict(student_data, flow)
+        
+        # Extract scores for chart
+        scores = {
+            "Reading": context["rc"]["score"],
+            "Writing": context.get("writing_score", 0.0),
+            "QR": context["qr"]["score"],
+            "AR": context["ar"]["score"],
+        }
+        
+        # Generate chart
+        chart_buffer = self._create_bar_chart(
+            context["student_name"],
+            scores,
+        )
+        
+        return chart_buffer.getvalue()

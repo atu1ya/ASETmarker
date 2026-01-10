@@ -149,7 +149,7 @@ class MockReportService:
         
         for row in reader:
             try:
-                name = row.get(column_mapping['name'], '').strip()
+                name = str(row.get(column_mapping['name'], '')).strip().title()
                 if not name:
                     continue
                 if any(day in name.lower() for day in ['mon ', 'tue ', 'wed ', 'thu ', 'fri ', 'sat ', 'sun ']):

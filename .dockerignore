@@ -1,0 +1,73 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+tests/
+
+# Development files
+requirements.dev.txt
+*.md
+!README.md
+zz left to do.md
+milestones.md
+
+# Environment files
+.env
+.env.*
+*.local
+
+# Documentation
+docs/
+Prompts/
+devtools/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Input/output directories (if not needed in container)
+inputs/
+outputs/

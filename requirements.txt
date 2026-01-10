@@ -15,3 +15,4 @@ python-multipart>=0.0.9
 Jinja2>=3.1.4
 reportlab>=4.0.6
 itsdangerous>=2.0.1
+gunicorn>=21.2.0

@@ -279,6 +279,14 @@ async def process_batch(
 
         output_buffer = io.BytesIO()
         summary_rows = []
+        detailed_rows = []
+        
+        # Get totals from config for percentage calculations
+        reading_total = len(config.reading_answers) if config.reading_answers else 35
+        qr_total = len(config.qr_answers) if config.qr_answers else 35
+        ar_total = len(config.ar_answers) if config.ar_answers else 35
+        writing_total = 50  # Standard writing total
+        
         try:
             sheets_io = io.BytesIO(sheets_bytes)
             with ZipFile(sheets_io) as sheets_archive_ctx, ZipFile(output_buffer, "w") as results_zip:
@@ -297,7 +305,79 @@ async def process_batch(
                         result["ar_score"],
                         result["notes"]
                     ])
-                # Write batch_summary.csv
+                    
+                    # Prepare detailed row with percentages and standard score
+                    if result["status"] == "Success":
+                        reading_score = float(result["reading_score"]) if result["reading_score"] else 0.0
+                        writing_score = float(result["writing_score"]) if result["writing_score"] else 0.0
+                        qr_score = float(result["qr_score"]) if result["qr_score"] else 0.0
+                        ar_score = float(result["ar_score"]) if result["ar_score"] else 0.0
+                        
+                        # Calculate percentages
+                        reading_pct = round((reading_score / reading_total * 100), 2) if reading_total > 0 else 0.0
+                        qr_pct = round((qr_score / qr_total * 100), 2) if qr_total > 0 else 0.0
+                        ar_pct = round((ar_score / ar_total * 100), 2) if ar_total > 0 else 0.0
+                        
+                        # Calculate total standard score (sum of raw scores)
+                        total_standard_score = reading_score + writing_score + qr_score + ar_score
+                    else:
+                        # Error case: fill with zeros
+                        reading_score = 0.0
+                        writing_score = 0.0
+                        qr_score = 0.0
+                        ar_score = 0.0
+                        reading_pct = 0.0
+                        qr_pct = 0.0
+                        ar_pct = 0.0
+                        total_standard_score = 0.0
+                    
+                    detailed_rows.append([
+                        result["student_name"],
+                        reading_score,
+                        reading_pct,
+                        writing_score,
+                        qr_score,
+                        qr_pct,
+                        ar_score,
+                        ar_pct,
+                        total_standard_score
+                    ])
+                
+                # Calculate batch averages for detailed report
+                if detailed_rows:
+                    num_students = len(detailed_rows)
+                    
+                    # Sum each numeric column (skip student name at index 0)
+                    col_sums = [0.0] * 8  # 8 numeric columns
+                    for row in detailed_rows:
+                        for i in range(1, 9):  # Columns 1-8 are numeric
+                            col_sums[i-1] += row[i]
+                    
+                    # Calculate averages
+                    col_averages = [round(s / num_students, 2) for s in col_sums]
+                    
+                    # Create averages row
+                    averages_row = ["Batch Averages"] + col_averages
+                    detailed_rows.append(averages_row)
+                
+                # Write detailed_batch_report.csv
+                detailed_csv_buffer = io.StringIO()
+                detailed_writer = csv.writer(detailed_csv_buffer)
+                detailed_writer.writerow([
+                    "Student Name/Test Time",
+                    "Reading Score (/35)",
+                    "Reading %",
+                    "Writing Score (/50)",
+                    "QR Score (/35)",
+                    "QR %",
+                    "AR score (/35)",
+                    "AR %",
+                    "Total Standard Score (/400)"
+                ])
+                detailed_writer.writerows(detailed_rows)
+                results_zip.writestr("detailed_batch_report.csv", detailed_csv_buffer.getvalue())
+                
+                # Write batch_summary.csv (keep existing for backwards compatibility)
                 csv_buffer = io.StringIO()
                 writer = csv.writer(csv_buffer)
                 writer.writerow(["Student Name", "Status", "Writing Score", "Reading Score", "QR Score", "AR Score", "Notes"])
