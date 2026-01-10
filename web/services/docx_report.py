@@ -477,22 +477,12 @@ class DocxReportGenerator:
         
         # Use passed totals if available, otherwise default to 35 (standard exam total)
         # This ensures correct percentages even if concept mapping is incomplete
-        if 'reading_total' in student_data:
-            reading_total = float(student_data['reading_total'])
-        else:
-            reading_total = 35.0
+        # HARDCODE: Always use 35 as the total for percentage calculations
+        reading_total = 35.0
+        qr_total = 35.0
+        ar_total = 35.0
         
-        if 'qr_total' in student_data:
-            qr_total = float(student_data['qr_total'])
-        else:
-            qr_total = 35.0
-        
-        if 'ar_total' in student_data:
-            ar_total = float(student_data['ar_total'])
-        else:
-            ar_total = 35.0
-        
-        # Calculate percentages and round to 2 decimal places
+        # Calculate percentages based on fixed total of 35, rounded to 2 decimal places
         reading_percentage = round((reading_correct / reading_total * 100) if reading_total > 0 else 0, 2)
         qr_percentage = round((qr_correct / qr_total * 100) if qr_total > 0 else 0, 2)
         ar_percentage = round((ar_correct / ar_total * 100) if ar_total > 0 else 0, 2)
@@ -568,9 +558,10 @@ class DocxReportGenerator:
                 "percentage": round(reading_percentage, 2),
                 "concepts": reading_concepts,
             },
-            "reading_score": round(reading_correct, 2),
-            "qr_score": round(qr_correct, 2),
-            "ar_score": round(ar_correct, 2),
+            # TOP-LEVEL SCORES AS PERCENTAGES (for Jinja template)
+            "reading_score": round(reading_percentage, 2),
+            "qr_score": round(qr_percentage, 2),
+            "ar_score": round(ar_percentage, 2),
             "reading_concepts": reading_concepts,
             "qr_concepts": qr_concepts,
         }
@@ -597,15 +588,15 @@ class DocxReportGenerator:
         ar_score = float(student_data.get('ar', student_data.get('ar_score', 0)))
         total_score = float(student_data.get('total', student_data.get('total_score', 0)))
         
-        # Default totals for percentage calculation (standard test totals)
-        reading_total = float(student_data.get('reading_total', 35))
-        qr_total = float(student_data.get('qr_total', 35))
-        ar_total = float(student_data.get('ar_total', 35))
+        # HARDCODE: Always use 35 as the total for all subjects
+        reading_total = 35.0
+        qr_total = 35.0
+        ar_total = 35.0
         
-        # Calculate percentages
-        reading_percentage = (reading_score / reading_total * 100) if reading_total > 0 else 0
-        qr_percentage = (qr_score / qr_total * 100) if qr_total > 0 else 0
-        ar_percentage = (ar_score / ar_total * 100) if ar_total > 0 else 0
+        # Calculate percentages based on fixed total of 35, rounded to 2 decimal places
+        reading_percentage = round((reading_score / reading_total * 100) if reading_total > 0 else 0, 2)
+        qr_percentage = round((qr_score / qr_total * 100) if qr_total > 0 else 0, 2)
+        ar_percentage = round((ar_score / ar_total * 100) if ar_total > 0 else 0, 2)
         
         # Check if concept data is provided in student_data
         # If provided, use it directly; otherwise fall back to defaults
@@ -679,9 +670,10 @@ class DocxReportGenerator:
                 "percentage": round(reading_percentage, 2),
                 "concepts": reading_concepts,
             },
-            "reading_score": round(reading_score, 2),
-            "qr_score": round(qr_score, 2),
-            "ar_score": round(ar_score, 2),
+            # TOP-LEVEL SCORES AS PERCENTAGES (for Jinja template)
+            "reading_score": round(reading_percentage, 2),
+            "qr_score": round(qr_percentage, 2),
+            "ar_score": round(ar_percentage, 2),
             "reading_concepts": reading_concepts,
             "qr_concepts": qr_concepts,
         }
