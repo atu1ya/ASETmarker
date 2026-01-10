@@ -413,14 +413,12 @@ class TestCreateBarChart:
         assert header[:4] == b'\x89PNG'
     
     def test_create_bar_chart_with_custom_max(self, generator):
-        """Test chart with custom max scores."""
+        """Test chart generation with different score values."""
         scores = {"Reading": 25, "Writing": 30}
-        max_scores = {"Reading": 35, "Writing": 50}
         
         result = generator._create_bar_chart(
             "Test Student",
             scores,
-            max_scores=max_scores,
         )
         
         assert isinstance(result, io.BytesIO)

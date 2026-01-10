@@ -266,15 +266,13 @@ class DocxReportGenerator:
         self,
         student_name: str,
         scores: Dict[str, float],
-        max_scores: Optional[Dict[str, float]] = None,
     ) -> io.BytesIO:
         """
-        Generate a bar chart comparing student scores to maximum scores.
+        Generate a bar chart showing student scores only.
         
         Args:
             student_name: Name of the student (for chart title)
             scores: Dictionary of subject names to student scores
-            max_scores: Optional dictionary of subject names to max scores
             
         Returns:
             BytesIO buffer containing the chart as PNG image
@@ -284,19 +282,10 @@ class DocxReportGenerator:
         subjects = list(scores.keys())
         student_values = [scores[s] for s in subjects]
         
-        # Default max scores if not provided
-        if max_scores is None:
-            max_scores = {s: 100 for s in subjects}
-        max_values = [max_scores.get(s, 100) for s in subjects]
-        
         x = range(len(subjects))
-        width = 0.35
         
-        # Create bars
-        bars1 = ax.bar([i - width/2 for i in x], student_values, width, 
-                       label='Student Score', color='#3498DB', edgecolor='white')
-        bars2 = ax.bar([i + width/2 for i in x], max_values, width,
-                       label='Maximum Score', color='#95A5A6', edgecolor='white')
+        # Create single bar for student scores
+        bars = ax.bar(x, student_values, color='#3498DB', edgecolor='white', width=0.6)
         
         # Customize chart
         ax.set_xlabel('Subject', fontweight='bold', fontsize=10)
@@ -304,17 +293,19 @@ class DocxReportGenerator:
         ax.set_title(f'Performance Summary', fontweight='bold', fontsize=12)
         ax.set_xticks(list(x))
         ax.set_xticklabels(subjects, fontsize=9)
-        ax.legend(loc='upper right', fontsize=8)
-        ax.set_ylim(0, max(max_values) * 1.1)
+        
+        # Set y-axis limit with some padding
+        max_value = max(student_values) if student_values else 100
+        ax.set_ylim(0, max_value * 1.15)
         
         # Add value labels on bars
-        for bar in bars1:
+        for bar in bars:
             height = bar.get_height()
             ax.annotate(f'{height:.0f}',
                        xy=(bar.get_x() + bar.get_width() / 2, height),
                        xytext=(0, 3),
                        textcoords="offset points",
-                       ha='center', va='bottom', fontsize=8)
+                       ha='center', va='bottom', fontsize=9)
         
         # Add gridlines
         ax.yaxis.grid(True, linestyle='--', alpha=0.7)
@@ -591,13 +582,21 @@ class DocxReportGenerator:
         else:
             context = self._build_context_from_dict(student_data, flow)
         
+        # Ensure all required keys exist (prevent UndefinedError)
+        if 'rc' not in context:
+            context['rc'] = {'score': 0.0, 'total': 0.0, 'percentage': 0.0, 'concepts': []}
+        if 'qr' not in context:
+            context['qr'] = {'score': 0.0, 'total': 0.0, 'percentage': 0.0, 'concepts': []}
+        if 'ar' not in context:
+            context['ar'] = {'score': 0.0, 'total': 0.0, 'percentage': 0.0}
+        
         # Load template
         doc = DocxTemplate(self.template_path)
         
-        # Generate and add chart image
+        # Generate and add chart image (student scores only, no maximum)
         scores = {
-            "Reading": context["reading"]["score"],
-            "Writing": context["writing_score"],
+            "Reading": context["rc"]["score"],
+            "Writing": context.get("writing_score", 0.0),
             "QR": context["qr"]["score"],
             "AR": context["ar"]["score"],
         }
