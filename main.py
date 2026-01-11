@@ -1,9 +1,6 @@
 """
 
- OMRChecker
-
- Author: Udayraj Deshmukh
- Github: https://github.com/Udayraj123
+run with uvicorn web.app:app --host 0.0.0.0 --port 8000 --reload
 
 """
 
