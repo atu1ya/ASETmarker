@@ -42,6 +42,14 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def add_custom_headers(request: Request, call_next):
+    """Easter Egg: Add custom signature headers to all responses."""
+    response = await call_next(request)
+    response.headers["X-Who-will-fix-it"] = "Atulya C"
+    return response
+
+
 @app.on_event("startup")
 async def on_startup() -> None:
     """Log when the application starts."""

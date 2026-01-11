@@ -690,6 +690,28 @@ strong {
     border-top: 1px solid var(--gray-200);
 }
 
+/* Easter Egg: Interactive Footer */
+.footer p {
+    cursor: help;
+    display: inline-block;
+    position: relative;
+}
+
+.footer p:hover::after {
+    content: " (The Architect)";
+    opacity: 0;
+    animation: fadeInText 0.5s ease-in forwards;
+}
+
+@keyframes fadeInText {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
 /* Tables */
 .table {
     width: 100%;

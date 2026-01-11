@@ -2,6 +2,58 @@
  * ASET Marking System - Main JavaScript
  */
 
+// Easter Egg: Console Signature
+console.log(
+    "%c If this breaks, Atulya will fix it ",
+    "background: #0066cc; color: white; padding: 8px 16px; font-size: 16px; font-weight: bold; border-radius: 4px;"
+);
+console.log("Live as if you were to die tomorrow. Learn as if you were to live forever. — Mahatma Gandhi");
+
+// Easter Egg: Key Sequence Listener
+(function() {
+    const keystrokeBuffer = [];
+    const maxBufferSize = 20;
+    const swearWords = [
+        'fuck', 'shit', 'damn', 'hell', 'ass', 'bitch', 'bastard',
+        'crap', 'piss', 'dick', 'cock', 'pussy', 'slut', 'whore'
+    ];
+
+    function checkBuffer() {
+        const typedText = keystrokeBuffer.join('').toLowerCase();
+
+        if (typedText.includes('atulya')) {
+            alert('#epicgoated super cool guy');
+            keystrokeBuffer.length = 0;
+            return;
+        }
+
+        if (typedText.includes('yethmin')) {
+            alert("dev's son");
+            keystrokeBuffer.length = 0;
+            return;
+        }
+
+        for (const swear of swearWords) {
+            if (typedText.includes(swear)) {
+                alert('Language! 😠 We are watching you.');
+                keystrokeBuffer.length = 0;
+                return;
+            }
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        // Ignore modifier keys and special keys
+        if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            keystrokeBuffer.push(e.key);
+            if (keystrokeBuffer.length > maxBufferSize) {
+                keystrokeBuffer.shift();
+            }
+            checkBuffer();
+        }
+    });
+})();
+
 class FlashManager {
     constructor() {
         this.container = document.getElementById('flash-container');
