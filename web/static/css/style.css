@@ -690,20 +690,6 @@ strong {
     border-top: 1px solid var(--gray-200);
 }
 
-/* Easter Egg: Interactive Footer */
-.footer p {
-    display: inline-block;
-    position: relative;
-}
-
-@keyframes fadeInText {
-    0% {
-        opacity: 0;
-    }
-    100% {
-        opacity: 1;
-    }
-}
 
 /* Tables */
 .table {
