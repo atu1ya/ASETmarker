@@ -1,27 +1,27 @@
 {
     "_instructions": "This file maps questions to learning areas. Edit to match your exam.",
     "_threshold": "Students scoring >=51% in an area are 'Done Well', below 51% is 'Needs Improvement'",
-    "_format": "Each question should appear in exactly ONE area per subject",
+    "_format": "Questions CAN appear in multiple areas per subject (e.g., r22 can test both inference and cause/effect)",
 
     "Reading": {
         "Understanding main ideas": ["r1", "r2", "r6", "r21", "r26", "r35"],
         "Inference and deduction": ["r3", "r5", "r16", "r17", "r18", "r22", "r28", "r34"],
         "Identifying key details": ["r4", "r7", "r8", "r9", "r10", "r11", "r12", "r15", "r19", "r20", "r23", "r24", "r27", "r29"],
         "Vocabulary context clues": ["r14", "r25", "r31"],
-        "Author's purpose and tone": ["r13"],
-        "Cause and effect relationships": [],
+        "Author's purpose and tone": ["r13", "r26"],
+        "Cause and effect relationships": ["r21", "r22", "r24"],
         "Understanding tone and attitude": ["r32"],
         "Figurative / Literary devices": ["r30", "r33"]
     },
 
     "Quantitative Reasoning": {
         "Fractions / Decimals": ["qr7", "qr28", "qr30", "qr31", "qr34", "qr35"],
-        "Time": [],
+        "Time": ["qr28"],
         "Algebra": ["qr6", "qr18", "qr21", "qr22"],
         "Geometry": ["qr1", "qr2", "qr3", "qr4", "qr5", "qr33"],
         "Graph / Data Interpretation": ["qr8", "qr9", "qr10", "qr12", "qr13", "qr32"],
         "Multiplication / Division": ["qr14", "qr15", "qr16", "qr17", "qr29"],
-        "Area / Perimeter": [],
+        "Area / Perimeter": ["qr3, qr5"],
         "Ratios / Unit Conversions": ["qr19", "qr20"],
         "Probability": ["qr26"],
         "Patterns / Sequences": ["qr23", "qr24", "qr25"],

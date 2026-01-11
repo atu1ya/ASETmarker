@@ -487,7 +487,11 @@ class DocxReportGenerator:
         qr_percentage = round((qr_correct / qr_total * 100) if qr_total > 0 else 0, 2)
         ar_percentage = round((ar_correct / ar_total * 100) if ar_total > 0 else 0, 2)
         
-        total_score = reading_correct + qr_correct + ar_correct + writing_score
+        # Writing score is already a percentage - use it directly
+        writing_percentage = round(writing_score, 2)
+        
+        # Total score is sum of all 4 percentages
+        total_score = reading_percentage + writing_percentage + qr_percentage + ar_percentage
         
         # Build concept lists with mastery ticks and question numbers
         # Use actual concept names from analysis results, not hardcoded defaults
@@ -531,6 +535,7 @@ class DocxReportGenerator:
             "student_name": student_name,
             "total_score": round(total_score, 2),
             "writing_score": round(writing_score, 2),
+            "writing_percentage": round(writing_percentage, 2),
             # Reading Comprehension structure (key: 'rc')
             "rc": {
                 "score": round(reading_correct, 2),
@@ -588,15 +593,38 @@ class DocxReportGenerator:
         ar_score = float(student_data.get('ar', student_data.get('ar_score', 0)))
         total_score = float(student_data.get('total', student_data.get('total_score', 0)))
         
-        # HARDCODE: Always use 35 as the total for all subjects
-        reading_total = 35.0
-        qr_total = 35.0
-        ar_total = 35.0
-        
-        # Calculate percentages based on fixed total of 35, rounded to 2 decimal places
-        reading_percentage = round((reading_score / reading_total * 100) if reading_total > 0 else 0, 2)
-        qr_percentage = round((qr_score / qr_total * 100) if qr_total > 0 else 0, 2)
-        ar_percentage = round((ar_score / ar_total * 100) if ar_total > 0 else 0, 2)
+        if flow_type == FlowType.MOCK:
+            # MOCK FLOW: Use standardised scores directly from CSV without any conversion
+            # CSV columns: Standardised Reading Score, Standardised Writing Score, 
+            # Standardised QR Score, Standardised AR Score, Total Standard Score (/400)
+            reading_percentage = round(reading_score, 2)
+            writing_percentage = round(writing_score, 2)
+            qr_percentage = round(qr_score, 2)
+            ar_percentage = round(ar_score, 2)
+            # Use total directly from CSV (Total Standard Score (/400))
+            total_score = round(total_score, 2)
+            
+            # For display in nested structures, use the scores as-is
+            reading_total = 100.0  # Standardised scores are out of 100
+            qr_total = 100.0
+            ar_total = 100.0
+        else:
+            # STANDARD/BATCH FLOW: Calculate percentages from raw scores
+            # HARDCODE: Always use 35 as the total for Reading/QR/AR
+            reading_total = 35.0
+            qr_total = 35.0
+            ar_total = 35.0
+            
+            # Calculate percentages based on fixed totals, rounded to 2 decimal places
+            reading_percentage = round((reading_score / reading_total * 100) if reading_total > 0 else 0, 2)
+            qr_percentage = round((qr_score / qr_total * 100) if qr_total > 0 else 0, 2)
+            ar_percentage = round((ar_score / ar_total * 100) if ar_total > 0 else 0, 2)
+            
+            # Writing score is already a percentage - use it directly
+            writing_percentage = round(writing_score, 2)
+            
+            # Recalculate total_score as sum of all 4 percentages
+            total_score = reading_percentage + writing_percentage + qr_percentage + ar_percentage
         
         # Check if concept data is provided in student_data
         # If provided, use it directly; otherwise fall back to defaults
@@ -643,6 +671,7 @@ class DocxReportGenerator:
             "student_name": student_name,
             "total_score": round(total_score, 2),
             "writing_score": round(writing_score, 2),
+            "writing_percentage": round(writing_percentage, 2),
             # Reading Comprehension structure (key: 'rc')
             "rc": {
                 "score": round(reading_score, 2),
@@ -727,12 +756,14 @@ class DocxReportGenerator:
         # Load template
         doc = DocxTemplate(self.template_path)
         
-        # Generate and add chart image (student scores only, no maximum)
+        # Generate and add chart image using PERCENTAGES (not raw scores)
+        # Writing score is already a percentage - use it directly
         scores = {
-            "Reading": context["rc"]["score"],
-            "Writing": context.get("writing_score", 0.0),
-            "QR": context["qr"]["score"],
-            "AR": context["ar"]["score"],
+            "Reading": context["rc"]["percentage"],
+            "Writing": context.get("writing_percentage", context.get("writing_score", 0.0)),
+            "QR": context["qr"]["percentage"],
+            "AR": context["ar"]["percentage"],
+            "Total": context.get("total_score", 0.0),
         }
         
         chart_buffer = self._create_bar_chart(
@@ -820,12 +851,13 @@ class DocxReportGenerator:
         else:
             context = self._build_context_from_dict(student_data, flow)
         
-        # Extract scores for chart
+        # Extract scores for chart (use percentages, same as embedded chart)
         scores = {
-            "Reading": context["rc"]["score"],
-            "Writing": context.get("writing_score", 0.0),
-            "QR": context["qr"]["score"],
-            "AR": context["ar"]["score"],
+            "Reading": context["rc"]["percentage"],
+            "Writing": context.get("writing_percentage", context.get("writing_score", 0.0)),
+            "QR": context["qr"]["percentage"],
+            "AR": context["ar"]["percentage"],
+            "Total": context.get("total_score", 0.0),
         }
         
         # Generate chart

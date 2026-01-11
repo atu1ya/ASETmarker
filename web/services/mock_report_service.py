@@ -138,10 +138,11 @@ class MockReportService:
         
         column_mapping = {
             'name': self._find_best_column_match(headers, ['Student Name', 'Name', 'student']),
-            'reading': self._find_best_column_match(headers, ['Standardised Reading', 'Reading'], prefer_standardised=True),
-            'writing': self._find_best_column_match(headers, ['Standardised Writing', 'Writing'], prefer_standardised=True),
-            'qr': self._find_best_column_match(headers, ['Standardised QR', 'QR Score', 'Quantitative Reasoning'], prefer_standardised=True),
-            'ar': self._find_best_column_match(headers, ['Standardised AR', 'AR Score', 'Abstract Reasoning'], prefer_standardised=True),
+            'reading': self._find_best_column_match(headers, ['Standardised Reading Score', 'Standardised Reading', 'Reading'], prefer_standardised=True),
+            'writing': self._find_best_column_match(headers, ['Standardised Writing Score', 'Standardised Writing', 'Writing'], prefer_standardised=True),
+            'qr': self._find_best_column_match(headers, ['Standardised QR Score', 'Standardised QR', 'QR Score', 'Quantitative Reasoning'], prefer_standardised=True),
+            'ar': self._find_best_column_match(headers, ['Standardised AR Score', 'Standardised AR', 'AR Score', 'Abstract Reasoning'], prefer_standardised=True),
+            'total': self._find_best_column_match(headers, ['Total Standard Score (/400)', 'Total Standard Score', 'Total Score'], prefer_standardised=True),
         }
         
         if not column_mapping['name']:
@@ -155,13 +156,16 @@ class MockReportService:
                 if any(day in name.lower() for day in ['mon ', 'tue ', 'wed ', 'thu ', 'fri ', 'sat ', 'sun ']):
                     continue
                 
+                # Use the mapped total column, or fall back to second-to-last column
+                total_col = column_mapping.get('total') or total_score_column
+                
                 student = {
                     'name': name,
                     'reading': self._parse_score(row.get(column_mapping['reading'], '0') if column_mapping['reading'] else '0'),
                     'writing': self._parse_score(row.get(column_mapping['writing'], '0') if column_mapping['writing'] else '0'),
                     'qr': self._parse_score(row.get(column_mapping['qr'], '0') if column_mapping['qr'] else '0'),
                     'ar': self._parse_score(row.get(column_mapping['ar'], '0') if column_mapping['ar'] else '0'),
-                    'total': self._parse_score(row.get(total_score_column, '0')),
+                    'total': self._parse_score(row.get(total_col, '0') if total_col else '0'),
                 }
                 
                 if any(student[key] > 0 for key in ['reading', 'writing', 'qr', 'ar', 'total']):

@@ -47,7 +47,7 @@ class AnalysisService:
         
         subject_map = self.concept_map.get(subject, {})
         area_results: List[LearningAreaResult] = []
-        mapped_questions = set()
+        mapped_questions = set()  # Track all questions that appear in at least one concept
         
         for area, questions in subject_map.items():
             total = len(questions)
@@ -57,6 +57,8 @@ class AnalysisService:
             for q in questions:
                 normalized_q = normalize_label(q)
                 question_nums.append(normalized_q)
+                # Track this question as mapped (using normalized form for comparison)
+                mapped_questions.add(normalized_q)
                 if correct_lookup.get(normalized_q, False):
                     correct_count += 1
             
@@ -75,11 +77,11 @@ class AnalysisService:
                 status=status,
                 question_numbers=question_numbers_str
             ))
-            mapped_questions.update(questions)
         
-        # Find unmapped questions
-        all_labels = set(q["label"] for q in question_results)
-        unmapped = list(all_labels - mapped_questions)
+        # Find unmapped questions (questions not in ANY concept)
+        # Use normalized labels for comparison
+        all_normalized_labels = set(normalize_label(q["label"]) for q in question_results)
+        unmapped = [q["label"] for q in question_results if normalize_label(q["label"]) not in mapped_questions]
         
         return SubjectAnalysis(
             subject=subject,
