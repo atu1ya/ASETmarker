@@ -17,8 +17,17 @@
       <div style="display: flex; gap: 8px; align-items: center;">
         <input id="prefix" class="input" type="text" placeholder="Prefix (e.g. 2026_)" style="width: 120px;">
         <span>+ Student Name +</span>
-        <input id="suffix" class="input" type="text" placeholder="Suffix (e.g. _reading.png)" style="width: 140px;">
+        <input id="suffix" class="input" type="text" placeholder="Suffix (optional)" style="width: 140px;">
       </div>
+    </div>
+    <div class="form-group">
+      <label>Image File Extension:</label>
+      <div id="ext-buttons" style="display: flex; gap: 8px; margin-top: 4px;">
+        <button type="button" class="button ext-btn" data-ext="jpg" onclick="selectExtension('jpg')">JPG</button>
+        <button type="button" class="button ext-btn" data-ext="jpeg" onclick="selectExtension('jpeg')">JPEG</button>
+        <button type="button" class="button ext-btn is-primary" data-ext="png" onclick="selectExtension('png')">PNG</button>
+      </div>
+      <input type="hidden" id="selected-extension" value="png">
     </div>
     <div class="form-group">
       <button type="button" class="button" onclick="generateTable()">Generate Table</button>
@@ -46,6 +55,40 @@
 <script>
 function sanitizeFilename(str) {
   return str.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function selectExtension(ext) {
+  document.getElementById('selected-extension').value = ext;
+  // Update button styles
+  document.querySelectorAll('#ext-buttons .ext-btn').forEach(btn => {
+    btn.classList.remove('is-primary');
+    if (btn.dataset.ext === ext) {
+      btn.classList.add('is-primary');
+    }
+  });
+  // Regenerate table if it exists to update filenames
+  regenerateFilenames();
+}
+
+function getSelectedExtension() {
+  return document.getElementById('selected-extension').value || 'png';
+}
+
+function regenerateFilenames() {
+  const rows = document.querySelectorAll('#students-table tbody tr');
+  if (rows.length === 0) return;
+  
+  const prefix = document.getElementById('prefix').value;
+  const suffix = document.getElementById('suffix').value;
+  const ext = getSelectedExtension();
+  
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('input');
+    const name = cells[0].value.trim();
+    const sanitized = sanitizeFilename(name);
+    cells[2].value = `${prefix}${sanitized}_reading.${ext}${suffix}`.replace(/_+/g, '_');
+    cells[3].value = `${prefix}${sanitized}_qrar.${ext}${suffix}`.replace(/_+/g, '_');
+  });
 }
 
 function importCSV(event) {
@@ -120,6 +163,7 @@ function importCSV(event) {
     // Populate the table
     const prefix = document.getElementById('prefix').value;
     const suffix = document.getElementById('suffix').value;
+    const ext = getSelectedExtension();
     const tableSection = document.getElementById('table-section');
     const tbody = document.querySelector('#students-table tbody');
     tbody.innerHTML = '';
@@ -140,13 +184,13 @@ function importCSV(event) {
       
       // Reading File
       const tdReading = document.createElement('td');
-      const readingFile = `${prefix}${sanitizeFilename(student.name)}_reading.png${suffix}`.replace(/_+/g, '_');
+      const readingFile = `${prefix}${sanitizeFilename(student.name)}_reading.${ext}${suffix}`.replace(/_+/g, '_');
       tdReading.innerHTML = `<input type="text" class="input" value="${readingFile}">`;
       row.appendChild(tdReading);
       
       // QRAR File
       const tdQRAR = document.createElement('td');
-      const qrarFile = `${prefix}${sanitizeFilename(student.name)}_qrar.png${suffix}`.replace(/_+/g, '_');
+      const qrarFile = `${prefix}${sanitizeFilename(student.name)}_qrar.${ext}${suffix}`.replace(/_+/g, '_');
       tdQRAR.innerHTML = `<input type="text" class="input" value="${qrarFile}">`;
       row.appendChild(tdQRAR);
       
@@ -191,6 +235,7 @@ function generateTable() {
   const names = document.getElementById('student-names').value.split('\n').map(n => n.trim()).filter(n => n);
   const prefix = document.getElementById('prefix').value;
   const suffix = document.getElementById('suffix').value;
+  const ext = getSelectedExtension();
   const tableSection = document.getElementById('table-section');
   const tbody = document.querySelector('#students-table tbody');
   tbody.innerHTML = '';
@@ -206,12 +251,12 @@ function generateTable() {
     row.appendChild(tdScore);
     // Reading File
     const tdReading = document.createElement('td');
-    const readingFile = `${prefix}${sanitizeFilename(name)}_reading.png${suffix}`.replace(/_+/g, '_');
+    const readingFile = `${prefix}${sanitizeFilename(name)}_reading.${ext}${suffix}`.replace(/_+/g, '_');
     tdReading.innerHTML = `<input type="text" class="input" value="${readingFile}">`;
     row.appendChild(tdReading);
     // QRAR File
     const tdQRAR = document.createElement('td');
-    const qrarFile = `${prefix}${sanitizeFilename(name)}_qrar.png${suffix}`.replace(/_+/g, '_');
+    const qrarFile = `${prefix}${sanitizeFilename(name)}_qrar.${ext}${suffix}`.replace(/_+/g, '_');
     tdQRAR.innerHTML = `<input type="text" class="input" value="${qrarFile}">`;
     row.appendChild(tdQRAR);
     // Remove
