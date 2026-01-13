@@ -153,8 +153,8 @@ class FileInputHandler {
     }
 
     handleChange(event) {
-        const file = event.target.files[0];
-        if (!file) {
+        const files = event.target.files;
+        if (!files || files.length === 0) {
             return;
         }
 
@@ -165,9 +165,17 @@ class FileInputHandler {
                 nameEl.className = 'file-name';
                 this.wrapper.appendChild(nameEl);
             }
-            nameEl.textContent = file.name;
+            
+            // Display file count or single filename
+            if (files.length === 1) {
+                nameEl.textContent = files[0].name;
+            } else {
+                nameEl.textContent = `${files.length} files selected`;
+            }
         }
 
+        // Preview first image if applicable
+        const file = files[0];
         if (this.preview && file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = (loadEvent) => {

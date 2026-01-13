@@ -51,12 +51,13 @@
             </div>
         </div>
         <div class="form-group">
-            <label class="form-label" for="sheets_zip">Sheets Archive (ZIP of PNG files)</label>
+            <label class="form-label" for="sheets_zip">Sheets (ZIP archive or individual image files)</label>
             <div class="file-input-wrapper">
                 <span class="file-icon">&#128230;</span>
-                <span class="file-text">Click to upload or drop file here</span>
-                <input type="file" id="sheets_zip" name="sheets_zip" accept=".zip" required>
+                <span class="file-text">Click to upload or drop files here (ZIP, PNG, JPG, JPEG)</span>
+                <input type="file" id="sheets_zip" name="sheets_zip" accept=".zip,.png,.jpg,.jpeg" multiple>
             </div>
+            <p class="form-text">Upload a single ZIP file containing all images, or select multiple image files directly.</p>
         </div>
         <button type="submit" class="btn btn-primary">Process Batch</button>
     </form>
