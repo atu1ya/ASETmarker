@@ -126,57 +126,65 @@ async def process_batch(
         # Collect all sheets (either from ZIP or individual files)
         sheets_dict: Dict[str, bytes] = {}
         
-        # Get all files from sheets_zip field (could be one ZIP or multiple images)
-        sheets_files = form.getlist("sheets_zip")
-        logger.info(f"Received {len(sheets_files)} file(s) in sheets_zip field")
+        # Get files from all possible field names
+        all_field_names = ["sheets_zip", "sheets_folder", "sheets_files"]
         
-        for file_item in sheets_files:
-            # Skip non-file items (form.getlist can return strings)
-            if not hasattr(file_item, 'filename') or not hasattr(file_item, 'read'):
-                continue
+        for field_name in all_field_names:
+            sheets_files = form.getlist(field_name)
+            if sheets_files:
+                logger.info(f"Found {len(sheets_files)} item(s) in '{field_name}' field")
             
-            filename = getattr(file_item, 'filename', None)
-            if not filename:
-                continue
+            for file_item in sheets_files:
+                # Skip non-file items (form.getlist can return strings)
+                if not hasattr(file_item, 'filename') or not hasattr(file_item, 'read'):
+                    continue
                 
-            logger.info(f"Processing uploaded file: {filename}")
-            
-            # Check if it's a ZIP file
-            if filename.lower().endswith('.zip'):
-                file_bytes = await file_item.read()  # type: ignore
-                size_limit = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
-                if len(file_bytes) > size_limit:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Uploaded ZIP exceeds the allowed size for batch processing.",
-                    )
+                filename = getattr(file_item, 'filename', None)
+                if not filename:
+                    continue
+                    
+                logger.info(f"Processing uploaded file: {filename}")
                 
-                # Extract files from ZIP
-                try:
-                    sheets_io = io.BytesIO(file_bytes)
-                    with ZipFile(sheets_io) as zf:
-                        for name in zf.namelist():
-                            # Skip directories and hidden files
-                            if name.endswith('/') or name.startswith('__MACOSX') or name.startswith('.'):
-                                continue
-                            # Get just the filename (in case files are in subdirectories)
-                            basename = Path(name).name
-                            if basename.lower().endswith(('.png', '.jpg', '.jpeg')):
-                                sheets_dict[basename] = zf.read(name)
-                                # Also store with full path for fallback matching
-                                sheets_dict[name] = zf.read(name)
-                                logger.info(f"Extracted from ZIP: {basename}")
-                except BadZipFile as exc:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Sheets upload must be a valid ZIP archive.",
-                    ) from exc
-            
-            # Check if it's an image file
-            elif filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-                content = await file_item.read()  # type: ignore
-                sheets_dict[filename] = content
-                logger.info(f"Loaded image file: {filename} ({len(content)} bytes)")
+                # Check if it's a ZIP file
+                if filename.lower().endswith('.zip'):
+                    file_bytes = await file_item.read()  # type: ignore
+                    size_limit = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+                    if len(file_bytes) > size_limit:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Uploaded ZIP exceeds the allowed size for batch processing.",
+                        )
+                    
+                    # Extract files from ZIP
+                    try:
+                        sheets_io = io.BytesIO(file_bytes)
+                        with ZipFile(sheets_io) as zf:
+                            for name in zf.namelist():
+                                # Skip directories and hidden files
+                                if name.endswith('/') or name.startswith('__MACOSX') or name.startswith('.'):
+                                    continue
+                                # Get just the filename (in case files are in subdirectories)
+                                basename = Path(name).name
+                                if basename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                                    sheets_dict[basename] = zf.read(name)
+                                    # Also store with full path for fallback matching
+                                    sheets_dict[name] = zf.read(name)
+                                    logger.info(f"Extracted from ZIP: {basename}")
+                    except BadZipFile as exc:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Sheets upload must be a valid ZIP archive.",
+                        ) from exc
+                
+                # Check if it's an image file
+                elif filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    content = await file_item.read()  # type: ignore
+                    # For folder uploads, filename may include path (e.g., "folder/image.png")
+                    # Store both the full path and just the basename for flexible matching
+                    basename = Path(filename).name
+                    sheets_dict[filename] = content
+                    sheets_dict[basename] = content  # Also store by basename
+                    logger.info(f"Loaded image file: {basename} ({len(content)} bytes)")
         
         if not sheets_dict:
             raise HTTPException(

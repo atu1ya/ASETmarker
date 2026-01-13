@@ -224,6 +224,22 @@ class FormHandler {
 
         try {
             const formData = new FormData(this.form);
+            
+            // Log what we're sending for debugging
+            console.log('Submitting form to:', this.form.action);
+            let fileCount = 0;
+            for (let [key, value] of formData.entries()) {
+                if (value instanceof File) {
+                    fileCount++;
+                    if (fileCount <= 5) {
+                        console.log(`File: ${key} = ${value.name} (${value.size} bytes)`);
+                    }
+                }
+            }
+            if (fileCount > 5) {
+                console.log(`... and ${fileCount - 5} more files`);
+            }
+            
             const response = await fetch(this.form.action, {
                 method: 'POST',
                 body: formData,
@@ -235,6 +251,7 @@ class FormHandler {
                 await this.handleJsonResponse(response);
             }
         } catch (error) {
+            console.error('Form submission error:', error);
             this.options.onError(error.message || 'Unexpected error');
         } finally {
             this.setLoading(false);
