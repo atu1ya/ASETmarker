@@ -86,14 +86,17 @@ async def generate_mock_reports(
                     flow_type='mock',
                 )
                 safe_name = student['name'].replace(' ', '_')
-                bundle.writestr(f"{safe_name}_Report.docx", docx_bytes)
+                
+                # Create folder structure: StudentName/StudentName_Report.docx
+                bundle.writestr(f"{safe_name}/{safe_name}_Report.docx", docx_bytes)
                 
                 # Generate performance chart as PNG
                 chart_bytes = docx_generator.generate_chart_bytes(
                     student_data=student,
                     flow_type='mock',
                 )
-                bundle.writestr(f"{safe_name}_Graph.png", chart_bytes)
+                # Store chart in same student folder
+                bundle.writestr(f"{safe_name}/{safe_name}_Graph.png", chart_bytes)
         
         zip_buffer.seek(0)
         filename = "Mock_Reports.zip"

@@ -103,23 +103,37 @@ class MockReportService:
     
     def _find_best_column_match(self, headers: List[str], target_keywords: List[str], prefer_standardised: bool = False) -> Optional[str]:
         """Find the best matching column header using fuzzy matching."""
+        # Keep original headers for matching
+        search_headers = list(headers)
+        
         if prefer_standardised:
+            # First try to find standardised columns
             standardised_headers = [h for h in headers if 'standardised' in h.lower() or 'standardized' in h.lower()]
             if standardised_headers:
-                headers = standardised_headers
+                search_headers = standardised_headers
         
+        # First pass: exact substring match (case-insensitive)
         for keyword in target_keywords:
-            for header in headers:
+            for header in search_headers:
                 if keyword.lower() in header.lower():
+                    # Skip raw score columns if we prefer standardised
                     if prefer_standardised and ('(/35)' in header or '(/50)' in header or '(/20)' in header):
                         continue
                     return header
         
+        # Second pass: fuzzy matching
         for keyword in target_keywords:
-            matches = get_close_matches(keyword.lower(), [h.lower() for h in headers], n=1, cutoff=0.6)
+            matches = get_close_matches(keyword.lower(), [h.lower() for h in search_headers], n=1, cutoff=0.6)
             if matches:
-                for header in headers:
+                for header in search_headers:
                     if header.lower() == matches[0]:
+                        return header
+        
+        # Fallback: if prefer_standardised didn't find anything, try all headers
+        if prefer_standardised and search_headers != headers:
+            for keyword in target_keywords:
+                for header in headers:
+                    if keyword.lower() in header.lower():
                         return header
         
         return None
@@ -134,6 +148,11 @@ class MockReportService:
         if not headers or len(headers) < 2:
             raise ValueError("CSV must have at least 2 columns.")
         
+        # Debug: print headers to understand structure
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"CSV Headers found: {headers}")
+        
         total_score_column = headers[-2]
         
         column_mapping = {
@@ -142,8 +161,11 @@ class MockReportService:
             'writing': self._find_best_column_match(headers, ['Standardised Writing Score', 'Standardised Writing', 'Writing'], prefer_standardised=True),
             'qr': self._find_best_column_match(headers, ['Standardised QR Score', 'Standardised QR', 'QR Score', 'Quantitative Reasoning'], prefer_standardised=True),
             'ar': self._find_best_column_match(headers, ['Standardised AR Score', 'Standardised AR', 'AR Score', 'Abstract Reasoning'], prefer_standardised=True),
-            'total': self._find_best_column_match(headers, ['Total Standard Score (/400)', 'Total Standard Score', 'Total Score'], prefer_standardised=True),
+            # Total doesn't use prefer_standardised because "Total Standard Score" doesn't contain "Standardised"
+            'total': self._find_best_column_match(headers, ['Total Standard Score (/400)', 'Total Standard Score', 'Total Score']),
         }
+        
+        logger.info(f"Column mapping: {column_mapping}")
         
         if not column_mapping['name']:
             raise ValueError("Could not find 'Student Name' column in CSV.")
@@ -159,18 +181,28 @@ class MockReportService:
                 # Use the mapped total column, or fall back to second-to-last column
                 total_col = column_mapping.get('total') or total_score_column
                 
+                # Get raw values for debugging
+                reading_raw = row.get(column_mapping['reading'], '0') if column_mapping['reading'] else '0'
+                writing_raw = row.get(column_mapping['writing'], '0') if column_mapping['writing'] else '0'
+                qr_raw = row.get(column_mapping['qr'], '0') if column_mapping['qr'] else '0'
+                ar_raw = row.get(column_mapping['ar'], '0') if column_mapping['ar'] else '0'
+                total_raw = row.get(total_col, '0') if total_col else '0'
+                
                 student = {
                     'name': name,
-                    'reading': self._parse_score(row.get(column_mapping['reading'], '0') if column_mapping['reading'] else '0'),
-                    'writing': self._parse_score(row.get(column_mapping['writing'], '0') if column_mapping['writing'] else '0'),
-                    'qr': self._parse_score(row.get(column_mapping['qr'], '0') if column_mapping['qr'] else '0'),
-                    'ar': self._parse_score(row.get(column_mapping['ar'], '0') if column_mapping['ar'] else '0'),
-                    'total': self._parse_score(row.get(total_col, '0') if total_col else '0'),
+                    'reading': self._parse_score(reading_raw),
+                    'writing': self._parse_score(writing_raw),
+                    'qr': self._parse_score(qr_raw),
+                    'ar': self._parse_score(ar_raw),
+                    'total': self._parse_score(total_raw),
                 }
+                
+                logger.info(f"Student {name}: reading={student['reading']}, writing={student['writing']}, qr={student['qr']}, ar={student['ar']}, total={student['total']}")
                 
                 if any(student[key] > 0 for key in ['reading', 'writing', 'qr', 'ar', 'total']):
                     students.append(student)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Error parsing row: {e}")
                 continue
         
         return students
