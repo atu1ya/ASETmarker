@@ -330,7 +330,7 @@ class DocxReportGenerator:
         # Customize chart
         ax.set_xlabel('Subject', fontweight='bold', fontsize=10)
         ax.set_ylabel('Score', fontweight='bold', fontsize=10)
-        ax.set_title(f'Performance Summary', fontweight='bold', fontsize=12)
+        ax.set_title(f'Performance Summary - {student_name}', fontweight='bold', fontsize=12)
         ax.set_xticks(list(x))
         ax.set_xticklabels(subjects, fontsize=9)
         
