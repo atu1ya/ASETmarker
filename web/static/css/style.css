@@ -302,6 +302,12 @@ strong {
     color: var(--primary);
 }
 
+.btn-outline.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
 .btn-sm {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;

@@ -50,18 +50,93 @@
                 <input type="file" id="manifest" name="manifest" accept=".json" required>
             </div>
         </div>
+        
         <div class="form-group">
-            <label class="form-label" for="sheets_zip">Sheets (ZIP archive or individual image files)</label>
+            <label class="form-label">Upload Method</label>
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                <button type="button" class="btn btn-outline upload-method-btn active" data-method="zip" onclick="switchUploadMethod('zip')">ZIP File</button>
+                <button type="button" class="btn btn-outline upload-method-btn" data-method="folder" onclick="switchUploadMethod('folder')">Folder</button>
+                <button type="button" class="btn btn-outline upload-method-btn" data-method="files" onclick="switchUploadMethod('files')">Individual Files</button>
+            </div>
+        </div>
+        
+        <!-- ZIP Upload -->
+        <div class="form-group upload-section" id="upload-zip">
+            <label class="form-label" for="sheets_zip">Sheets Archive (ZIP)</label>
             <div class="file-input-wrapper">
                 <span class="file-icon">&#128230;</span>
-                <span class="file-text">Click to upload or drop files here (ZIP, PNG, JPG, JPEG)</span>
-                <input type="file" id="sheets_zip" name="sheets_zip" accept=".zip,.png,.jpg,.jpeg" multiple>
+                <span class="file-text">Click to upload or drop ZIP file here</span>
+                <input type="file" id="sheets_zip" name="sheets_zip" accept=".zip">
             </div>
-            <p class="form-text">Upload a single ZIP file containing all images, or select multiple image files directly.</p>
+            <p class="form-text">Upload a ZIP file containing all student scan images.</p>
         </div>
+        
+        <!-- Folder Upload -->
+        <div class="form-group upload-section" id="upload-folder" style="display: none;">
+            <label class="form-label" for="sheets_folder">Select Folder</label>
+            <div class="file-input-wrapper">
+                <span class="file-icon">&#128194;</span>
+                <span class="file-text">Click to select a folder containing images</span>
+                <input type="file" id="sheets_folder" name="sheets_zip" accept=".png,.jpg,.jpeg" webkitdirectory multiple>
+            </div>
+            <p class="form-text">Select a folder containing PNG, JPG, or JPEG images.</p>
+        </div>
+        
+        <!-- Individual Files Upload -->
+        <div class="form-group upload-section" id="upload-files" style="display: none;">
+            <label class="form-label" for="sheets_files">Select Images</label>
+            <div class="file-input-wrapper">
+                <span class="file-icon">&#128444;</span>
+                <span class="file-text">Click to select multiple image files</span>
+                <input type="file" id="sheets_files" name="sheets_zip" accept=".png,.jpg,.jpeg" multiple>
+            </div>
+            <p class="form-text">Select multiple PNG, JPG, or JPEG image files.</p>
+        </div>
+        
         <button type="submit" class="btn btn-primary">Process Batch</button>
     </form>
 </section>
+
+<script>
+function switchUploadMethod(method) {
+    // Update button states
+    document.querySelectorAll('.upload-method-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.method === method) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Show/hide upload sections and clear inputs
+    document.querySelectorAll('.upload-section').forEach(section => {
+        section.style.display = 'none';
+        const input = section.querySelector('input[type="file"]');
+        if (input) {
+            input.value = '';
+            input.disabled = true;
+            // Clear file name display
+            const nameEl = section.querySelector('.file-name');
+            if (nameEl) nameEl.remove();
+        }
+    });
+    
+    // Show selected section and enable its input
+    const activeSection = document.getElementById('upload-' + method);
+    if (activeSection) {
+        activeSection.style.display = 'block';
+        const input = activeSection.querySelector('input[type="file"]');
+        if (input) {
+            input.disabled = false;
+        }
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set initial state - ZIP is active by default
+    switchUploadMethod('zip');
+});
+</script>
 
 <section id="results-section" class="card results-section hidden">
     <div class="results-icon">&#10003;</div>
