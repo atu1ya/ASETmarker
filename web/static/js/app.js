@@ -22,20 +22,20 @@ console.log("Live as if you were to die tomorrow. Learn as if you were to live f
         const typedText = keystrokeBuffer.join('').toLowerCase();
 
         if (typedText.includes('atulya')) {
-            alert('#epicgoated super cool guy');
+            alert('Super cool epic goated guy who made this');
             keystrokeBuffer.length = 0;
             return;
         }
 
         if (typedText.includes('yethmin')) {
-            alert("dev's son");
+            alert("developer's son, super cringe guy");
             keystrokeBuffer.length = 0;
             return;
         }
 
         for (const swear of swearWords) {
             if (typedText.includes(swear)) {
-                alert('Language! 😠 We are watching you.');
+                alert('Watch your language pal');
                 keystrokeBuffer.length = 0;
                 return;
             }
