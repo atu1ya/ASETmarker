@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from web.app import templates
 from web.config import Settings
 from web.dependencies import get_current_session, get_settings
-from web.services.mock_report_service import MockReportService
+from web.services.mock_report_service import MockReportService, READING_CONCEPTS, QR_CONCEPTS
 from web.services.docx_report import DocxReportGenerator
 
 router = APIRouter()
@@ -72,8 +72,15 @@ async def generate_mock_reports(
                 detail="No valid student data found in CSV.",
             )
         
-        # Initialize DocX report generator
-        docx_generator = DocxReportGenerator()
+        # Convert concept dictionaries to the expected format
+        # Format: {'Reading': {'concept_name': 'q1, q2, q3'}, 'Quantitative Reasoning': {...}}
+        concept_mapping = {
+            'Reading': {concept: ', '.join(questions) for concept, questions in READING_CONCEPTS.items()},
+            'Quantitative Reasoning': {concept: ', '.join(questions) for concept, questions in QR_CONCEPTS.items()}
+        }
+        
+        # Initialize DocX report generator with concept mapping
+        docx_generator = DocxReportGenerator(concept_mapping=concept_mapping)
         
         # Generate ZIP archive with Word reports and email templates
         zip_buffer = io.BytesIO()

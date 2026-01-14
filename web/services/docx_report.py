@@ -385,7 +385,11 @@ class DocxReportGenerator:
             List of ConceptMastery objects
         """
         concepts = []
-        question_map = CONCEPT_QUESTION_MAPPING.get(subject_name, {})
+        # Prioritize self.concept_mapping if available, otherwise use global CONCEPT_QUESTION_MAPPING
+        if self.concept_mapping is not None:
+            question_map = self.concept_mapping.get(subject_name, {})
+        else:
+            question_map = CONCEPT_QUESTION_MAPPING.get(subject_name, {})
         
         if flow_type == FlowType.MOCK:
             # Mock flow: use provided concept names with empty checkmarks
