@@ -15,6 +15,35 @@
     100% { transform: rotate(360deg); }
 }
 
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    gap: 1.5rem;
+}
+
+.loading-overlay .spinner {
+    width: 4rem;
+    height: 4rem;
+    border-width: 5px;
+}
+
+.loading-overlay .loading-message {
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--secondary);
+    text-align: center;
+}
+
 /* Utility Classes */
 .hidden {
     display: none !important;

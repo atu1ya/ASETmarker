@@ -241,5 +241,9 @@ async def process_single_student(
 
     zip_buffer.seek(0)
     filename = f"{folder_name}_results.zip"
-    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    content_length = str(zip_buffer.getbuffer().nbytes)
+    headers = {
+        "Content-Disposition": f"attachment; filename={filename}",
+        "Content-Length": content_length
+    }
     return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)

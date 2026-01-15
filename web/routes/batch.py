@@ -494,5 +494,9 @@ async def process_batch(
 
         output_buffer.seek(0)
         filename = "batch_results.zip"
-        headers = {"Content-Disposition": f"attachment; filename={filename}"}
+        content_length = str(output_buffer.getbuffer().nbytes)
+        headers = {
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": content_length
+        }
         return StreamingResponse(output_buffer, media_type="application/zip", headers=headers)

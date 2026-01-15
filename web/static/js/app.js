@@ -201,10 +201,33 @@ class FormHandler {
         this.form.addEventListener('submit', (event) => this.handleSubmit(event));
     }
 
+    toggleOverlay(show) {
+        const existingOverlay = document.getElementById('loading-overlay');
+        
+        if (show) {
+            if (!existingOverlay) {
+                const overlay = document.createElement('div');
+                overlay.id = 'loading-overlay';
+                overlay.className = 'loading-overlay';
+                overlay.innerHTML = `
+                    <div class="spinner"></div>
+                    <div class="loading-message">Processing... please wait. This may take a minute.</div>
+                `;
+                document.body.appendChild(overlay);
+            }
+        } else {
+            if (existingOverlay) {
+                existingOverlay.remove();
+            }
+        }
+    }
+
     setLoading(loading) {
         if (!this.submitBtn) {
             return;
         }
+
+        this.toggleOverlay(loading);
 
         if (loading) {
             this.submitBtn.disabled = true;
