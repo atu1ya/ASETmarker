@@ -5,11 +5,11 @@
   {% include 'components/flash.html' %}
   
   <h2>Free Mock Report Generator</h2>
-  <p class="subtitle">Upload a CSV file containing student scores to generate individual performance reports and email templates.</p>
+  <p class="subtitle">Upload a CSV or Excel file containing student scores to generate individual performance reports and email templates.</p>
   
   <div class="card">
-    <h3>CSV Format Requirements</h3>
-    <p>Your CSV file must include the following columns:</p>
+    <h3>File Format Requirements</h3>
+    <p>Your CSV or Excel file must include the following columns:</p>
     <ul>
       <li><strong>Student Name</strong> - Full name of the student</li>
       <li><strong>Reading Score</strong> - Score out of 35</li>
@@ -23,9 +23,9 @@
 
   <form method="post" action="/mock-report/generate" enctype="multipart/form-data" class="upload-form">
     <div class="form-group">
-      <label for="csv-file">Upload CSV File:</label>
-      <input type="file" id="csv-file" name="csv_file" accept=".csv" required class="input">
-      <p class="help-text">Maximum file size: 10 MB</p>
+      <label for="csv-file">Upload CSV or Excel File:</label>
+      <input type="file" id="csv-file" name="csv_file" accept=".csv,.xlsx,.xls" required class="input">
+      <p class="help-text">Supported formats: CSV, Excel (.xlsx, .xls). Maximum file size: 10 MB</p>
     </div>
 
     <div class="form-actions">

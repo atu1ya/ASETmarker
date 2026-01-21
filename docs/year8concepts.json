@@ -1,0 +1,30 @@
+{
+  "_instructions": "This file maps questions to learning areas. Edit to match your exam.",
+  "_threshold": "Students scoring >=51% in an area are 'Done Well', below 51% is 'Needs Improvement'",
+  "_format": "Questions CAN appear in multiple areas per subject (e.g., r22 can test both inference and cause/effect)",
+
+  "Reading": {
+    "Understanding main ideas": ["r1", "r6", "r14", "r28", "r35"],
+    "Inference and deduction": ["r2", "r3", "r5", "r15", "r17", "r18", "r29", "r31", "r34"],
+    "Identifying key details": ["r4", "r7", "r8", "r9", "r10", "r11", "r16", "r19", "r20", "r21", "r22", "r23", "r24", "r27"],
+    "Vocabulary context clues": ["r13", "r25", "r26", "r33"],
+    "Author's purpose and tone": ["r1", "r6", "r10", "r14", "r26", "r34"],
+    "Cause and effect relationships": ["r21", "r22", "r24", "r27"],
+    "Understanding tone and attitude": ["r14", "r16", "r28", "r34"],
+    "Figurative / Literary devices": ["r15", "r19", "r32", "r33"]
+  },
+
+  "Quantitative Reasoning": {
+    "Time, speed, and average speed": ["qr2", "qr6", "qr14", "qr20", "qr28"],
+    "Algebra (equations and expressions)": ["qr3", "qr8", "qr12", "qr21", "qr33"],
+    "Ratios and proportions": ["qr5", "qr17", "qr19", "qr22", "qr29"],
+    "Number operations (multi step calculations)": ["qr1", "qr15", "qr16", "qr18", "qr24"],
+    "Sequences and patterns": ["qr4"],
+    "Sets and logical reasoning": ["qr7", "qr13"],
+    "Graphs, tables, and data interpretation": ["qr10", "qr19"],
+    "Measurement and unit conversion": ["qr6", "qr18", "qr20", "qr23", "qr24"],
+    "Rates and growth (exponential / repeated change)": ["qr9", "qr26"],
+    "Financial mathematics": ["qr15", "qr17", "qr18", "qr25", "qr27"],
+    "Applied problem solving (extended contexts)": ["qr30", "qr31", "qr32", "qr34", "qr35"]
+  }
+}

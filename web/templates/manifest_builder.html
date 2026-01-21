@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
 {% block content %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <div class="container">
   <h2>Manifest Builder</h2>
   <form id="manifest-form" onsubmit="return false;">
     <div class="form-group">
-      <label for="csv-upload">Import Student Data (CSV):</label>
-      <input type="file" id="csv-upload" class="input" accept=".csv" onchange="importCSV(event)">
-      <p class="help-text">Upload a CSV file with "Student Name" and "Writing Score" columns to auto-populate the table.</p>
+      <label for="csv-upload">Import Student Data (CSV or Excel):</label>
+      <input type="file" id="csv-upload" class="input" accept=".csv,.xlsx,.xls" onchange="importFile(event)">
+      <p class="help-text">Upload a CSV or Excel file with "Student Name" and "Writing Score" columns to auto-populate the table.</p>
     </div>
     <div class="form-group">
       <label for="student-names">Student Names (one per line):</label>
@@ -91,9 +92,105 @@ function regenerateFilenames() {
   });
 }
 
-function importCSV(event) {
+function importFile(event) {
   const file = event.target.files[0];
   if (!file) return;
+  
+  const fileName = file.name.toLowerCase();
+  if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+    importExcel(file);
+  } else if (fileName.endsWith('.csv')) {
+    importCSV(file);
+  } else {
+    alert('Please upload a CSV or Excel file (.csv, .xlsx, .xls)');
+  }
+}
+
+function importExcel(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      
+      // Get the first sheet
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      
+      // Convert to JSON with headers
+      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      
+      if (jsonData.length < 2) {
+        alert('Excel file must have at least a header row and one data row.');
+        return;
+      }
+      
+      // Find header row and column indices
+      let headerIndex = -1;
+      let nameColIndex = -1;
+      let scoreColIndex = -1;
+      
+      for (let i = 0; i < Math.min(5, jsonData.length); i++) {
+        const row = jsonData[i];
+        if (!row) continue;
+        
+        for (let j = 0; j < row.length; j++) {
+          const header = String(row[j] || '').toLowerCase();
+          if (header.includes('student') && header.includes('name')) {
+            nameColIndex = j;
+            headerIndex = i;
+          }
+          if (header.includes('writing') && (header.includes('score') || header.includes('/'))) {
+            scoreColIndex = j;
+          }
+        }
+        if (nameColIndex >= 0 && scoreColIndex >= 0) break;
+      }
+      
+      if (headerIndex < 0 || nameColIndex < 0 || scoreColIndex < 0) {
+        alert('Could not find "Student Name" and "Writing Score" columns in Excel file.');
+        return;
+      }
+      
+      // Parse student rows
+      const students = [];
+      for (let i = headerIndex + 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row) continue;
+        
+        const name = row[nameColIndex] ? String(row[nameColIndex]).trim() : '';
+        const scoreRaw = row[scoreColIndex];
+        
+        // Skip rows with empty name
+        if (!name) continue;
+        
+        // Extract numeric score
+        let score = 0;
+        if (typeof scoreRaw === 'number') {
+          score = Math.round(scoreRaw);
+        } else if (typeof scoreRaw === 'string') {
+          const scoreMatch = scoreRaw.match(/(\d+)/);
+          if (scoreMatch) score = parseInt(scoreMatch[1], 10);
+        }
+        
+        // Skip obviously invalid rows
+        if (name.toLowerCase().includes('sat ') || name.toLowerCase().includes('sun ') || 
+            name.toLowerCase().includes('mon ') || name.toLowerCase().includes('tue ')) {
+          continue;
+        }
+        
+        students.push({ name, score });
+      }
+      
+      populateTable(students, 'Excel');
+    } catch (err) {
+      alert('Error reading Excel file: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function importCSV(file) {
   
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -155,58 +252,61 @@ function importCSV(event) {
       students.push({ name, score });
     }
     
-    if (students.length === 0) {
-      alert('No valid student data found in CSV.');
-      return;
-    }
-    
-    // Populate the table
-    const prefix = document.getElementById('prefix').value;
-    const suffix = document.getElementById('suffix').value;
-    const ext = getSelectedExtension();
-    const tableSection = document.getElementById('table-section');
-    const tbody = document.querySelector('#students-table tbody');
-    tbody.innerHTML = '';
-    
-    students.forEach(student => {
-      const row = document.createElement('tr');
-      
-      // Name
-      const tdName = document.createElement('td');
-      tdName.innerHTML = `<input type="text" class="input" value="${student.name}">`;
-      row.appendChild(tdName);
-      
-      // Writing Score (convert from /50 to /20 if needed)
-      const tdScore = document.createElement('td');
-      const normalizedScore = student.score > 20 ? Math.round(student.score * 20 / 50) : student.score;
-      tdScore.innerHTML = `<input type="number" class="input" value="${normalizedScore}" min="0" max="20">`;
-      row.appendChild(tdScore);
-      
-      // Reading File
-      const tdReading = document.createElement('td');
-      const readingFile = `${prefix}${sanitizeFilename(student.name)}_reading.${ext}${suffix}`.replace(/_+/g, '_');
-      tdReading.innerHTML = `<input type="text" class="input" value="${readingFile}">`;
-      row.appendChild(tdReading);
-      
-      // QRAR File
-      const tdQRAR = document.createElement('td');
-      const qrarFile = `${prefix}${sanitizeFilename(student.name)}_qrar.${ext}${suffix}`.replace(/_+/g, '_');
-      tdQRAR.innerHTML = `<input type="text" class="input" value="${qrarFile}">`;
-      row.appendChild(tdQRAR);
-      
-      // Remove
-      const tdRemove = document.createElement('td');
-      tdRemove.innerHTML = `<button type="button" class="button is-danger" onclick="this.closest('tr').remove()">Remove</button>`;
-      row.appendChild(tdRemove);
-      
-      tbody.appendChild(row);
-    });
-    
-    tableSection.style.display = '';
-    alert(`Imported ${students.length} students from CSV.`);
+    populateTable(students, 'CSV');
   };
   
   reader.readAsText(file);
+}
+
+function populateTable(students, sourceType) {
+  if (students.length === 0) {
+    alert(`No valid student data found in ${sourceType} file.`);
+    return;
+  }
+  
+  const prefix = document.getElementById('prefix').value;
+  const suffix = document.getElementById('suffix').value;
+  const ext = getSelectedExtension();
+  const tableSection = document.getElementById('table-section');
+  const tbody = document.querySelector('#students-table tbody');
+  tbody.innerHTML = '';
+  
+  students.forEach(student => {
+    const row = document.createElement('tr');
+    
+    // Name
+    const tdName = document.createElement('td');
+    tdName.innerHTML = `<input type="text" class="input" value="${student.name}">`;
+    row.appendChild(tdName);
+    
+    // Writing Score (convert from /50 to /20 if needed)
+    const tdScore = document.createElement('td');
+    const normalizedScore = student.score > 20 ? Math.round(student.score * 20 / 50) : student.score;
+    tdScore.innerHTML = `<input type="number" class="input" value="${normalizedScore}" min="0" max="20">`;
+    row.appendChild(tdScore);
+    
+    // Reading File
+    const tdReading = document.createElement('td');
+    const readingFile = `${prefix}${sanitizeFilename(student.name)}_reading.${ext}${suffix}`.replace(/_+/g, '_');
+    tdReading.innerHTML = `<input type="text" class="input" value="${readingFile}">`;
+    row.appendChild(tdReading);
+    
+    // QRAR File
+    const tdQRAR = document.createElement('td');
+    const qrarFile = `${prefix}${sanitizeFilename(student.name)}_qrar.${ext}${suffix}`.replace(/_+/g, '_');
+    tdQRAR.innerHTML = `<input type="text" class="input" value="${qrarFile}">`;
+    row.appendChild(tdQRAR);
+    
+    // Remove
+    const tdRemove = document.createElement('td');
+    tdRemove.innerHTML = `<button type="button" class="button is-danger" onclick="this.closest('tr').remove()">Remove</button>`;
+    row.appendChild(tdRemove);
+    
+    tbody.appendChild(row);
+  });
+  
+  tableSection.style.display = '';
+  alert(`Imported ${students.length} students from ${sourceType}.`);
 }
 
 function parseCSVLine(line) {

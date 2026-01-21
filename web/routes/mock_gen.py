@@ -36,6 +36,9 @@ async def mock_report_page(
     )
 
 
+ALLOWED_DATA_EXTENSIONS = {'.csv', '.xlsx', '.xls'}
+
+
 @router.post("/mock-report/generate")
 async def generate_mock_reports(
     request: Request,
@@ -43,28 +46,39 @@ async def generate_mock_reports(
     session_token: str = Depends(get_current_session),
     settings: Settings = Depends(get_settings),
 ):
-    """Process the CSV and generate mock reports using docxtpl Word templates."""
+    """Process the CSV/Excel file and generate mock reports using docxtpl Word templates."""
     # Validate file type
-    if not csv_file.filename or not csv_file.filename.lower().endswith('.csv'):
+    if not csv_file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be a CSV file.",
+            detail="No file uploaded.",
         )
     
-    # Read CSV file
+    file_ext = Path(csv_file.filename).suffix.lower()
+    if file_ext not in ALLOWED_DATA_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be a CSV or Excel file (.csv, .xlsx, .xls).",
+        )
+    
+    # Read file
     size_limit = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
-    csv_bytes = await csv_file.read()
+    file_bytes = await csv_file.read()
     
-    if len(csv_bytes) > size_limit:
+    if len(file_bytes) > size_limit:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CSV file exceeds the maximum allowed size.",
+            detail="File exceeds the maximum allowed size.",
         )
     
-    # Process the CSV and generate reports
+    # Process the file and generate reports
     try:
         mock_service = MockReportService()
-        students_data = mock_service.parse_csv(csv_bytes)
+        # Parse based on file type
+        if file_ext == '.csv':
+            students_data = mock_service.parse_csv(file_bytes)
+        else:
+            students_data = mock_service.parse_excel(file_bytes)
         
         if not students_data:
             raise HTTPException(

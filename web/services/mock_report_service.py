@@ -6,6 +6,8 @@ from difflib import get_close_matches
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
+import pandas as pd
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -207,9 +209,72 @@ class MockReportService:
         
         return students
     
-    def _parse_score(self, value: str) -> float:
-        """Parse score from string."""
+    def parse_excel(self, excel_bytes: bytes) -> List[Dict[str, Any]]:
+        """Parse Excel file (.xlsx, .xls) and extract student data."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Read Excel file into DataFrame
+        df = pd.read_excel(io.BytesIO(excel_bytes))
+        
+        if df.empty or len(df.columns) < 2:
+            raise ValueError("Excel file must have at least 2 columns.")
+        
+        headers = list(df.columns)
+        logger.info(f"Excel Headers found: {headers}")
+        
+        column_mapping = {
+            'name': self._find_best_column_match(headers, ['Student Name', 'Name', 'student']),
+            'reading': self._find_best_column_match(headers, ['Standardised Reading Score', 'Standardised Reading', 'Reading'], prefer_standardised=True),
+            'writing': self._find_best_column_match(headers, ['Standardised Writing Score', 'Standardised Writing', 'Writing'], prefer_standardised=True),
+            'qr': self._find_best_column_match(headers, ['Standardised QR Score', 'Standardised QR', 'QR Score', 'Quantitative Reasoning'], prefer_standardised=True),
+            'ar': self._find_best_column_match(headers, ['Standardised AR Score', 'Standardised AR', 'AR Score', 'Abstract Reasoning'], prefer_standardised=True),
+            'total': self._find_best_column_match(headers, ['Total Standard Score (/400)', 'Total Standard Score', 'Total Score']),
+        }
+        
+        logger.info(f"Column mapping: {column_mapping}")
+        
+        if not column_mapping['name']:
+            raise ValueError("Could not find 'Student Name' column in Excel file.")
+        
+        students = []
+        for _, row in df.iterrows():
+            try:
+                name = str(row.get(column_mapping['name'], '')).strip().title()
+                if not name or name == 'Nan':
+                    continue
+                if any(day in name.lower() for day in ['mon ', 'tue ', 'wed ', 'thu ', 'fri ', 'sat ', 'sun ']):
+                    continue
+                
+                # Use the mapped total column, or fall back to second-to-last column
+                total_col = column_mapping.get('total') or headers[-2]
+                
+                student = {
+                    'name': name,
+                    'reading': self._parse_score(row.get(column_mapping['reading'], 0) if column_mapping['reading'] else 0),
+                    'writing': self._parse_score(row.get(column_mapping['writing'], 0) if column_mapping['writing'] else 0),
+                    'qr': self._parse_score(row.get(column_mapping['qr'], 0) if column_mapping['qr'] else 0),
+                    'ar': self._parse_score(row.get(column_mapping['ar'], 0) if column_mapping['ar'] else 0),
+                    'total': self._parse_score(row.get(total_col, 0) if total_col else 0),
+                }
+                
+                logger.info(f"Student {name}: reading={student['reading']}, writing={student['writing']}, qr={student['qr']}, ar={student['ar']}, total={student['total']}")
+                
+                if any(student[key] > 0 for key in ['reading', 'writing', 'qr', 'ar', 'total']):
+                    students.append(student)
+            except Exception as e:
+                logger.warning(f"Error parsing row: {e}")
+                continue
+        
+        return students
+    
+    def _parse_score(self, value) -> float:
+        """Parse score from string or number."""
         try:
+            # Handle numeric types directly
+            if isinstance(value, (int, float)):
+                return float(value) if not pd.isna(value) else 0.0
+            # Handle string values
             cleaned = ''.join(c for c in str(value) if c.isdigit() or c == '.')
             return float(cleaned) if cleaned else 0.0
         except:
