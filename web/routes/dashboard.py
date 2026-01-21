@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
@@ -34,8 +35,40 @@ def _pop_flash_messages(request: Request) -> list[dict[str, str]]:
     return messages
 
 
+def _is_header_row(row: list[str]) -> bool:
+    """Check if a CSV row appears to be a header row rather than data."""
+    if not row:
+        return False
+    first_cell = row[0].strip().lower()
+    # Common header words to skip
+    header_keywords = {'question', 'q', 'number', 'no', 'no.', '#', 'item', 'qn', 'qno'}
+    # Check if first cell is a header keyword (but not q1, q2, etc.)
+    if first_cell in header_keywords:
+        return True
+    # Check if second column (answer column) contains header-like text
+    if len(row) > 1:
+        second_cell = row[1].strip().lower()
+        answer_headers = {'answer', 'ans', 'correct', 'key', 'response', 'correct answer'}
+        if second_cell in answer_headers:
+            return True
+    return False
+
+
+def _is_question_row(row: list[str]) -> bool:
+    """Check if a CSV row looks like a question row (e.g., q1, 1, Q1, etc.)."""
+    if not row:
+        return False
+    first_cell = row[0].strip().lower()
+    # Match patterns like q1, q2, 1, 2, rc1, ar1, qr1, etc.
+    return bool(re.match(r'^(q|rc|ar|qr)?\d+$', first_cell))
+
+
 def parse_answer_key(content: str) -> list[str]:
-    """Parse answer keys provided either as newline separated values or CSV."""
+    """Parse answer keys provided either as newline separated values or CSV.
+    
+    Supports CSV files with optional header rows (e.g., 'Question,Answer').
+    Header rows are automatically skipped.
+    """
     cleaned = content.strip()
     if not cleaned:
         return []
@@ -43,15 +76,35 @@ def parse_answer_key(content: str) -> list[str]:
     if "," in cleaned:
         reader = csv.reader(StringIO(cleaned))
         answers: list[str] = []
+        found_data = False
         for row in reader:
             if not row:
                 continue
-            answer = row[-1].strip()
-            if answer:
-                answers.append(answer)
+            # Skip header rows until we find actual data
+            if not found_data:
+                if _is_header_row(row):
+                    continue
+                # Check if this looks like a question row to start parsing
+                if _is_question_row(row) or len(row) >= 2:
+                    found_data = True
+            if found_data:
+                answer = row[-1].strip()
+                if answer:
+                    answers.append(answer)
         return answers
 
-    return [line.strip() for line in cleaned.splitlines() if line.strip()]
+    # For non-CSV (newline separated), skip header-like lines
+    lines = cleaned.splitlines()
+    answers = []
+    for line in lines:
+        stripped = line.strip().lower()
+        if not stripped:
+            continue
+        # Skip common header words for plain text files
+        if stripped in {'answer', 'answers', 'key', 'answer key', 'correct', 'correct answers'}:
+            continue
+        answers.append(line.strip())
+    return answers
 
 
 def validate_concept_mapping(concepts: dict) -> list[str]:
