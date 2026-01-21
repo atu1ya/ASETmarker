@@ -233,6 +233,19 @@ async def process_batch(
                 if Path(key).name.lower() == basename.lower():
                     return data
             
+            # Extension-agnostic match (john_reading.png matches john_reading.jpg)
+            # Strip extension and match by stem
+            stem = Path(filename).stem.lower()
+            image_extensions = {'.png', '.jpg', '.jpeg'}
+            for key, data in sheets.items():
+                key_path = Path(key)
+                if key_path.suffix.lower() in image_extensions:
+                    if key_path.stem.lower() == stem:
+                        return data
+                    # Also check basename stem
+                    if Path(key_path.name).stem.lower() == stem:
+                        return data
+            
             # Partial match (filename contained in key or key contained in filename)
             for key, data in sheets.items():
                 if basename.lower() in key.lower() or Path(key).name.lower() in filename_lower:

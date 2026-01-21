@@ -24,11 +24,11 @@
     <div class="form-group">
       <label>Image File Extension:</label>
       <div id="ext-buttons" style="display: flex; gap: 8px; margin-top: 4px;">
-        <button type="button" class="button ext-btn" data-ext="jpg" onclick="selectExtension('jpg')">JPG</button>
+        <button type="button" class="button ext-btn is-primary" data-ext="jpg" onclick="selectExtension('jpg')">JPG</button>
         <button type="button" class="button ext-btn" data-ext="jpeg" onclick="selectExtension('jpeg')">JPEG</button>
-        <button type="button" class="button ext-btn is-primary" data-ext="png" onclick="selectExtension('png')">PNG</button>
+        <button type="button" class="button ext-btn" data-ext="png" onclick="selectExtension('png')">PNG</button>
       </div>
-      <input type="hidden" id="selected-extension" value="png">
+      <input type="hidden" id="selected-extension" value="jpg">
     </div>
     <div class="form-group">
       <button type="button" class="button" onclick="generateTable()">Generate Table</button>
@@ -136,12 +136,17 @@ function importExcel(file) {
         
         for (let j = 0; j < row.length; j++) {
           const header = String(row[j] || '').toLowerCase();
-          if (header.includes('student') && header.includes('name')) {
+          // Match "STUDENT NAME" or "Student Name" or just "Name" column
+          if ((header.includes('student') && header.includes('name')) || header === 'name') {
             nameColIndex = j;
             headerIndex = i;
           }
-          if (header.includes('writing') && (header.includes('score') || header.includes('/'))) {
-            scoreColIndex = j;
+          // Match "Writing Score", "Writing Score (/50)", "Writing %", "Writing" etc.
+          if (header.includes('writing') && (header.includes('score') || header.includes('/') || header.includes('%') || header.trim() === 'writing')) {
+            // Prefer "Writing Score" over "Writing %"
+            if (scoreColIndex < 0 || header.includes('score') || header.includes('/50')) {
+              scoreColIndex = j;
+            }
           }
         }
         if (nameColIndex >= 0 && scoreColIndex >= 0) break;
@@ -211,12 +216,17 @@ function importCSV(file) {
       const cells = parseCSVLine(lines[i]);
       for (let j = 0; j < cells.length; j++) {
         const header = cells[j].toLowerCase();
-        if (header.includes('student') && header.includes('name')) {
+        // Match "STUDENT NAME" or "Student Name" or just "Name" column
+        if ((header.includes('student') && header.includes('name')) || header.trim() === 'name') {
           nameColIndex = j;
           headerIndex = i;
         }
-        if (header.includes('writing') && header.includes('score')) {
-          scoreColIndex = j;
+        // Match "Writing Score", "Writing Score (/50)", "Writing %", "Writing" etc.
+        if (header.includes('writing') && (header.includes('score') || header.includes('/') || header.includes('%') || header.trim() === 'writing')) {
+          // Prefer "Writing Score" over "Writing %"
+          if (scoreColIndex < 0 || header.includes('score') || header.includes('/50')) {
+            scoreColIndex = j;
+          }
         }
       }
       if (nameColIndex >= 0 && scoreColIndex >= 0) break;
@@ -234,14 +244,15 @@ function importCSV(file) {
       const name = cells[nameColIndex] ? cells[nameColIndex].trim() : '';
       const scoreText = cells[scoreColIndex] ? cells[scoreColIndex].trim() : '';
       
-      // Skip rows with empty name or non-numeric score
+      // Skip rows with empty name
       if (!name) continue;
       
-      // Extract numeric score (handle formats like "45/50" or "45")
+      // Extract numeric score (handle formats like "45/50" or "45" or empty/0)
+      let score = 0;
       const scoreMatch = scoreText.match(/(\d+)/);
-      if (!scoreMatch) continue; // Skip rows without numeric score
-      
-      const score = parseInt(scoreMatch[1], 10);
+      if (scoreMatch) {
+        score = parseInt(scoreMatch[1], 10);
+      }
       
       // Skip obviously invalid rows (e.g., date/time headers)
       if (name.toLowerCase().includes('sat ') || name.toLowerCase().includes('sun ') || 
