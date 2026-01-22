@@ -71,6 +71,7 @@ async def process_single_student(
     request: Request,
     student_name: str = Form(...),
     writing_score: int = Form(0, ge=0, le=100),
+    year_level: str = Form("year4_5"),
     reading_sheet: UploadFile = File(None),
     qrar_sheet: UploadFile = File(None),
     generate_report: bool = Form(False),
@@ -79,6 +80,9 @@ async def process_single_student(
 ):
     """Process single student uploads and return a ZIP archive of results."""
     from web.services.marker import SubjectResult
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Processing single student with year_level: {year_level}")
     
     # Check that at least one file is provided
     if not reading_sheet and not qrar_sheet:
@@ -217,7 +221,7 @@ async def process_single_student(
             )
             
             # Generate Word document report using docxtpl
-            docx_generator = DocxReportGenerator()
+            docx_generator = DocxReportGenerator(year_level=year_level)
             docx_bytes = docx_generator.generate_report_bytes(
                 student_data={
                     'name': student_name,
@@ -233,6 +237,23 @@ async def process_single_student(
                 analysis=full_analysis,
             )
             bundle.writestr(f"{folder_name}_Report.docx", docx_bytes)
+            
+            # Generate performance chart as separate PNG
+            chart_bytes = docx_generator.generate_chart_bytes(
+                student_data={
+                    'name': student_name,
+                    'writing_score': writing_score,
+                    'reading_score': reading_result.score,
+                    'reading_total': len(config.reading_answers),
+                    'qr_score': qr_result.score,
+                    'qr_total': len(config.qr_answers),
+                    'ar_score': ar_result.score,
+                    'ar_total': len(config.ar_answers),
+                },
+                flow_type='standard',
+                analysis=full_analysis,
+            )
+            bundle.writestr(f"{folder_name}_Graph.png", chart_bytes)
             
             # JSON results
             import dataclasses

@@ -268,6 +268,7 @@ class DocxReportGenerator:
         self,
         template_path: Optional[Path] = None,
         concept_mapping: Optional[Dict[str, Dict[str, List[str]]]] = None,
+        year_level: Optional[str] = None,
     ):
         """
         Initialize the DocxReportGenerator.
@@ -277,6 +278,8 @@ class DocxReportGenerator:
                           Defaults to config/report_template.docx
             concept_mapping: Optional mapping of subjects to concepts and question IDs.
                            Used for calculating mastery in Standard/Batch flows.
+            year_level: Optional year level identifier (e.g., "year4_5", "senior").
+                       Used to load concept mappings from config files.
         """
         if template_path is None:
             # Default to config/report_template.docx
@@ -284,10 +287,24 @@ class DocxReportGenerator:
         else:
             self.template_path = Path(template_path)
         
-        self.concept_mapping = concept_mapping
+        self.year_level = year_level or "year4_5"
+        
+        # If no concept mapping provided, try to load from config based on year level
+        if concept_mapping is None:
+            from web.services.concept_loader import get_reading_concepts, get_qr_concepts
+            reading_concepts = get_reading_concepts(self.year_level)
+            qr_concepts = get_qr_concepts(self.year_level)
+            # Convert to expected format
+            self.concept_mapping = {
+                'Reading': {concept: ', '.join(questions) for concept, questions in reading_concepts.items()},
+                'Quantitative Reasoning': {concept: ', '.join(questions) for concept, questions in qr_concepts.items()}
+            }
+        else:
+            self.concept_mapping = concept_mapping
+        
         self._validate_template()
         
-        logger.info(f"DocxReportGenerator initialized with template: {self.template_path}")
+        logger.info(f"DocxReportGenerator initialized with template: {self.template_path}, year_level: {self.year_level}")
     
     def _validate_template(self) -> None:
         """Validate that the template file exists and is readable."""

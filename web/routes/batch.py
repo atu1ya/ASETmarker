@@ -123,6 +123,11 @@ async def process_batch(
         # Parse form data to get all uploaded files
         form = await request.form()
         
+        # Get year_level from form (default to year4_5)
+        year_level_raw = form.get("year_level", "year4_5")
+        year_level: str = str(year_level_raw) if year_level_raw else "year4_5"
+        logger.info(f"Processing batch with year_level: {year_level}")
+        
         # Collect all sheets (either from ZIP or individual files)
         sheets_dict: Dict[str, bytes] = {}
         
@@ -155,21 +160,26 @@ async def process_batch(
                             detail="Uploaded ZIP exceeds the allowed size for batch processing.",
                         )
                     
-                    # Extract files from ZIP
+                    # Extract files from ZIP (recursive - walk all directories)
                     try:
                         sheets_io = io.BytesIO(file_bytes)
                         with ZipFile(sheets_io) as zf:
                             for name in zf.namelist():
                                 # Skip directories and hidden files
-                                if name.endswith('/') or name.startswith('__MACOSX') or name.startswith('.'):
+                                if name.endswith('/') or name.startswith('__MACOSX') or '/.' in name:
                                     continue
-                                # Get just the filename (in case files are in subdirectories)
+                                # Skip hidden files (starting with .)
                                 basename = Path(name).name
+                                if basename.startswith('.'):
+                                    continue
+                                # Check if it's an image file (regardless of directory depth)
                                 if basename.lower().endswith(('.png', '.jpg', '.jpeg')):
-                                    sheets_dict[basename] = zf.read(name)
+                                    file_data = zf.read(name)
+                                    # Store by basename for easy matching
+                                    sheets_dict[basename] = file_data
                                     # Also store with full path for fallback matching
-                                    sheets_dict[name] = zf.read(name)
-                                    logger.info(f"Extracted from ZIP: {basename}")
+                                    sheets_dict[name] = file_data
+                                    logger.info(f"Extracted from ZIP (deep scan): {name} -> {basename}")
                     except BadZipFile as exc:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
@@ -212,7 +222,7 @@ async def process_batch(
 
         marking_service = MarkingService(settings.CONFIG_DIR)
         analysis_service = AnalysisService(config.concept_mapping) if config.has_concept_mapping else None
-        docx_generator = DocxReportGenerator() if config.has_concept_mapping else None
+        docx_generator = DocxReportGenerator(year_level=year_level) if config.has_concept_mapping else None
         annotator_service = AnnotatorService()
 
         def _find_file_in_sheets(filename: str, sheets: Dict[str, bytes]) -> Optional[bytes]:
@@ -371,9 +381,25 @@ async def process_batch(
                         flow_type='batch',
                         analysis=full_analysis,
                     )
+                    # Generate performance chart as separate PNG
+                    chart_bytes = docx_generator.generate_chart_bytes(
+                        student_data={
+                            'name': student_name,
+                            'writing_score': writing_score,
+                            'reading_score': reading_result.score,
+                            'reading_total': len(config.reading_answers),
+                            'qr_score': qr_result.score,
+                            'qr_total': len(config.qr_answers),
+                            'ar_score': ar_result.score,
+                            'ar_total': len(config.ar_answers),
+                        },
+                        flow_type='batch',
+                        analysis=full_analysis,
+                    )
                     results_json = json.dumps(dataclasses.asdict(full_analysis), indent=2).encode("utf-8")
                     artifacts.extend([
                         (base_path + f"{folder_name}_Report.docx", docx_bytes),
+                        (base_path + f"{folder_name}_Graph.png", chart_bytes),
                         (base_path + f"{folder_name}_results.json", results_json),
                     ])
                 

@@ -28,6 +28,15 @@
       <p class="help-text">Supported formats: CSV, Excel (.xlsx, .xls). Maximum file size: 10 MB</p>
     </div>
 
+    <div class="form-group">
+      <label for="year_level">Year Level:</label>
+      <select id="year_level" name="year_level" class="input">
+        <option value="year4_5" selected>Year 4/5 (Standard)</option>
+        <option value="senior">Senior (Year 7+)</option>
+      </select>
+      <p class="help-text">Select the year level to determine concept mappings and school score targets.</p>
+    </div>
+
     <div class="form-actions">
       <button type="submit" class="button">Generate Reports</button>
       <a href="/dashboard" class="button is-secondary">Cancel</a>

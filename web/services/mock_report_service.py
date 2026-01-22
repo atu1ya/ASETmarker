@@ -22,6 +22,13 @@ from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
+from web.services.concept_loader import (
+    get_reading_concepts, 
+    get_qr_concepts, 
+    get_school_minimum_scores,
+    get_journey_stages
+)
+
 # Try to register Calibri font
 try:
     pdfmetrics.registerFont(TTFont('Calibri', 'calibri.ttf'))
@@ -33,7 +40,7 @@ except:
     BOLD_FONT = 'Helvetica-Bold'
 
 
-# School minimum scores table (hardcoded)
+# School minimum scores table (hardcoded fallback)
 SCHOOL_MINIMUM_SCORES = {
     'Perth Modern School': 244.34,
     'Willetton SHS': 235.98,
@@ -43,7 +50,7 @@ SCHOOL_MINIMUM_SCORES = {
     'Kelmscott SHS': 209.5,
 }
 
-# GATE Preparation Journey scores
+# GATE Preparation Journey scores (fallback)
 GATE_JOURNEY_STAGES = [
     ('T3 Y4', 155),
     ('T4 Y4', 170),
@@ -57,46 +64,43 @@ GATE_JOURNEY_STAGES = [
     ('Real Exam', 250),
 ]
 
-# Reading Comprehension concepts mapping
-READING_CONCEPTS = {
-    'Understanding main ideas': ['1', '2', '6', '21', '26', '35'],
-    'Inference and deduction': ['3', '5', '16', '17', '18', '22', '28', '34'],
-    'Identifying key details': ['4', '7', '8', '9', '10', '11', '12', '15', '19', '20', '23', '24', '27', '29'],
-    'Vocabulary context clues': ['14', '25', '31'],
-    "Author's purpose and tone": ['13', '26'],
-    'Cause and effect relationships': ['21', '22', '24'],
-    'Understanding tone and attitude': ['16', '18', '32', '34'],
-    'Figurative / Literary devices': ['30', '33'],
-}
+# Reading Comprehension concepts mapping (fallback, loaded from config when possible)
+READING_CONCEPTS = get_reading_concepts()
 
-# QR Concepts mapping
-QR_CONCEPTS = {
-    'Fractions / Decimals': ['7', '28', '30', '31', '34', '35'],
-    'Time': ['28'],
-    'Algebra': ['6', '18', '21', '22'],
-    'Geometry': ['1', '2', '3', '4', '5', '33'],
-    'Graph / Data Interpretation': ['8', '9', '10', '12', '13', '32'],
-    'Multiplication / Division': ['14', '15', '16', '17', '29'],
-    'Area / Perimeter': ['3', '5'],
-    'Ratios / Unit Conversions': ['19', '20', '22'],
-    'Probability': ['26'],
-    'Patterns / Sequences': ['23', '24', '25', '35'],
-    'Percentages': ['11', '27'],
-}
+# QR Concepts mapping (fallback, loaded from config when possible)
+QR_CONCEPTS = get_qr_concepts()
 
 
 class MockReportService:
     """Service for generating mock performance reports from CSV data."""
     
-    def __init__(self, concept_mapping: Optional[Dict] = None):
+    def __init__(self, concept_mapping: Optional[Dict] = None, year_level: Optional[str] = None):
         """
-        Initialize the service with optional concept mapping.
+        Initialize the service with optional concept mapping and year level.
         
         Args:
             concept_mapping: Dictionary mapping subjects to concepts and question IDs.
-                           If None, will use default hardcoded concepts.
+                           If None, will load from config based on year_level.
+            year_level: Year level identifier (e.g., "year4_5", "senior").
+                       Used to load concept mappings from config files.
         """
-        self.concept_mapping = concept_mapping
+        self.year_level = year_level or "year4_5"
+        
+        if concept_mapping:
+            self.concept_mapping = concept_mapping
+        else:
+            # Load from config based on year level
+            self.reading_concepts = get_reading_concepts(self.year_level)
+            self.qr_concepts = get_qr_concepts(self.year_level)
+            self.concept_mapping = {
+                'Reading': self.reading_concepts,
+                'Quantitative Reasoning': self.qr_concepts
+            }
+        
+        # Load school scores and journey stages from config
+        self.school_minimum_scores = get_school_minimum_scores(self.year_level) or SCHOOL_MINIMUM_SCORES
+        self.journey_stages = get_journey_stages(self.year_level) or GATE_JOURNEY_STAGES
+        
         self.threshold = 0.51  # 51% threshold for "Done Well"
         
         # Get image paths

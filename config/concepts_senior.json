@@ -1,0 +1,47 @@
+{
+  "_meta": {
+    "name": "Senior (Year 7+) ASET Concepts",
+    "description": "Concept mappings for Senior students (Year 7 and above) taking the advanced ASET exam",
+    "version": "1.0"
+  },
+  "Reading": {
+    "Critical analysis": ["1", "2", "3", "10", "15", "25", "30"],
+    "Advanced inference": ["4", "5", "6", "11", "16", "20", "26", "31"],
+    "Synthesis of ideas": ["7", "8", "12", "17", "21", "27", "32"],
+    "Advanced vocabulary": ["9", "13", "18", "22", "28", "33"],
+    "Evaluating arguments": ["14", "19", "23", "29", "34"],
+    "Textual structure": ["24", "35"]
+  },
+  "Quantitative Reasoning": {
+    "Advanced algebra": ["1", "6", "11", "16", "21", "26", "31"],
+    "Complex geometry": ["2", "7", "12", "17", "22", "27", "32"],
+    "Statistics and probability": ["3", "8", "13", "18", "23", "28", "33"],
+    "Number theory": ["4", "9", "14", "19", "24", "29", "34"],
+    "Problem solving": ["5", "10", "15", "20", "25", "30", "35"]
+  },
+  "school_minimum_scores": {
+    "Perth Modern School": 280.00,
+    "Willetton SHS": 270.00,
+    "Shenton SHS": 265.00,
+    "Rossmoyne SHS": 260.00,
+    "Harrisdale SHS": 255.00,
+    "Kelmscott SHS": 245.00
+  },
+  "journey_stages": [
+    {"label": "Start Y7", "score": 200},
+    {"label": "Mid Y7", "score": 220},
+    {"label": "End Y7", "score": 240},
+    {"label": "Start Y8", "score": 250},
+    {"label": "Mid Y8", "score": 260},
+    {"label": "Mock 1", "score": 270},
+    {"label": "Mock 2", "score": 280},
+    {"label": "Real Exam", "score": 290}
+  ],
+  "score_config": {
+    "reading_total": 35,
+    "writing_total": 50,
+    "qr_total": 35,
+    "ar_total": 35,
+    "total_max": 400
+  }
+}

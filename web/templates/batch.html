@@ -43,6 +43,15 @@
     <p class="form-text">Download a <a href="/docs/sample_manifest.json" download>sample manifest</a> to get started.</p>
     <form id="batch-form" method="post" action="/batch/process" enctype="multipart/form-data">
         <div class="form-group">
+            <label class="form-label" for="year_level">Year Level</label>
+            <select id="year_level" name="year_level" class="input">
+                <option value="year4_5" selected>Year 4/5 (Standard)</option>
+                <option value="senior">Senior (Year 7+)</option>
+            </select>
+            <p class="form-text">Select the year level to determine concept mappings and school score targets.</p>
+        </div>
+        
+        <div class="form-group">
             <label class="form-label" for="manifest">Manifest (JSON)</label>
             <div class="file-input-wrapper">
                 <span class="file-icon">&#128462;</span>

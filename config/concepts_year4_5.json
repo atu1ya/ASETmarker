@@ -1,0 +1,57 @@
+{
+  "_meta": {
+    "name": "Year 4/5 ASET Concepts",
+    "description": "Concept mappings for Year 4/5 students taking the standard ASET exam",
+    "version": "1.0"
+  },
+  "Reading": {
+    "Understanding main ideas": ["1", "2", "6", "21", "26", "35"],
+    "Inference and deduction": ["3", "5", "16", "17", "18", "22", "28", "34"],
+    "Identifying key details": ["4", "7", "8", "9", "10", "11", "12", "15", "19", "20", "23", "24", "27", "29"],
+    "Vocabulary context clues": ["14", "25", "31"],
+    "Author's purpose and tone": ["13", "26"],
+    "Cause and effect relationships": ["21", "22", "24"],
+    "Understanding tone and attitude": ["16", "18", "32", "34"],
+    "Figurative / Literary devices": ["30", "33"]
+  },
+  "Quantitative Reasoning": {
+    "Fractions / Decimals": ["7", "28", "30", "31", "34", "35"],
+    "Time": ["28"],
+    "Algebra": ["6", "18", "21", "22"],
+    "Geometry": ["1", "2", "3", "4", "5", "33"],
+    "Graph / Data Interpretation": ["8", "9", "10", "12", "13", "32"],
+    "Multiplication / Division": ["14", "15", "16", "17", "29"],
+    "Area / Perimeter": ["3", "5"],
+    "Ratios / Unit Conversions": ["19", "20", "22"],
+    "Probability": ["26"],
+    "Patterns / Sequences": ["23", "24", "25", "35"],
+    "Percentages": ["11", "27"]
+  },
+  "school_minimum_scores": {
+    "Perth Modern School": 244.34,
+    "Willetton SHS": 235.98,
+    "Shenton SHS": 231.55,
+    "Rossmoyne SHS": 227.00,
+    "Harrisdale SHS": 226.57,
+    "Kelmscott SHS": 209.5
+  },
+  "journey_stages": [
+    {"label": "T3 Y4", "score": 155},
+    {"label": "T4 Y4", "score": 170},
+    {"label": "Hol MC/T1 Y5", "score": 190},
+    {"label": "T2 Y5", "score": 200},
+    {"label": "T3 Y5", "score": 210},
+    {"label": "T4 Y5", "score": 220},
+    {"label": "Hol MC", "score": 230},
+    {"label": "Mock 1", "score": 240},
+    {"label": "Mock 2", "score": 250},
+    {"label": "Real Exam", "score": 250}
+  ],
+  "score_config": {
+    "reading_total": 35,
+    "writing_total": 50,
+    "qr_total": 35,
+    "ar_total": 35,
+    "total_max": 400
+  }
+}

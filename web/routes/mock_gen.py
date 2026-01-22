@@ -1,18 +1,20 @@
 """Mock report generation routes."""
 import io
+import logging
 from pathlib import Path
 from zipfile import ZipFile
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from web.app import templates
 from web.config import Settings
 from web.dependencies import get_current_session, get_settings
-from web.services.mock_report_service import MockReportService, READING_CONCEPTS, QR_CONCEPTS
+from web.services.mock_report_service import MockReportService
 from web.services.docx_report import DocxReportGenerator
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _pop_flash_messages(request: Request) -> list[dict[str, str]]:
@@ -43,10 +45,12 @@ ALLOWED_DATA_EXTENSIONS = {'.csv', '.xlsx', '.xls'}
 async def generate_mock_reports(
     request: Request,
     csv_file: UploadFile = File(...),
+    year_level: str = Form("year4_5"),
     session_token: str = Depends(get_current_session),
     settings: Settings = Depends(get_settings),
 ):
     """Process the CSV/Excel file and generate mock reports using docxtpl Word templates."""
+    logger.info(f"Generating mock reports with year_level: {year_level}")
     # Validate file type
     if not csv_file.filename:
         raise HTTPException(
@@ -73,7 +77,7 @@ async def generate_mock_reports(
     
     # Process the file and generate reports
     try:
-        mock_service = MockReportService()
+        mock_service = MockReportService(year_level=year_level)
         # Parse based on file type
         if file_ext == '.csv':
             students_data = mock_service.parse_csv(file_bytes)
@@ -86,15 +90,8 @@ async def generate_mock_reports(
                 detail="No valid student data found in CSV.",
             )
         
-        # Convert concept dictionaries to the expected format
-        # Format: {'Reading': {'concept_name': 'q1, q2, q3'}, 'Quantitative Reasoning': {...}}
-        concept_mapping = {
-            'Reading': {concept: ', '.join(questions) for concept, questions in READING_CONCEPTS.items()},
-            'Quantitative Reasoning': {concept: ', '.join(questions) for concept, questions in QR_CONCEPTS.items()}
-        }
-        
-        # Initialize DocX report generator with concept mapping
-        docx_generator = DocxReportGenerator(concept_mapping=concept_mapping)
+        # Initialize DocX report generator with year level (will load concepts from config)
+        docx_generator = DocxReportGenerator(year_level=year_level)
         
         # Generate ZIP archive with Word reports and email templates
         zip_buffer = io.BytesIO()

@@ -106,6 +106,56 @@ function importFile(event) {
   }
 }
 
+// Fuzzy column matching patterns
+const NAME_PATTERNS = [
+  /^student\s*name$/i,
+  /^name$/i,
+  /^student$/i,
+  /^candidate$/i,
+  /^first\s*name$/i,
+  /^full\s*name$/i,
+  /student.*name/i,
+  /name.*student/i,
+  /candidate.*name/i
+];
+
+const WRITING_PATTERNS = [
+  /^writing\s*score$/i,
+  /^writing$/i,
+  /writing.*score/i,
+  /writing.*\/\s*50/i,
+  /writing.*total/i,
+  /w\.\s*score/i,
+  /\/50/,
+  /score.*writing/i
+];
+
+function matchesNameColumn(header) {
+  const h = String(header || '').trim();
+  return NAME_PATTERNS.some(pattern => pattern.test(h));
+}
+
+function matchesWritingColumn(header) {
+  const h = String(header || '').trim();
+  return WRITING_PATTERNS.some(pattern => pattern.test(h));
+}
+
+function isValidStudentName(name) {
+  if (!name || name.length < 2) return false;
+  const lower = name.toLowerCase();
+  // Skip day names, common header words, numbers-only
+  const skipPatterns = [
+    /^(sat|sun|mon|tue|wed|thu|fri)\s/i,
+    /^(saturday|sunday|monday|tuesday|wednesday|thursday|friday)/i,
+    /^\d+$/,
+    /^total$/i,
+    /^average$/i,
+    /^mean$/i,
+    /^class$/i
+  ];
+  return !skipPatterns.some(p => p.test(lower));
+}
+
 function importExcel(file) {
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -125,35 +175,43 @@ function importExcel(file) {
         return;
       }
       
-      // Find header row and column indices
+      // Find header row and column indices using fuzzy matching
       let headerIndex = -1;
       let nameColIndex = -1;
       let scoreColIndex = -1;
       
-      for (let i = 0; i < Math.min(5, jsonData.length); i++) {
+      // Scan first 10 rows for headers
+      for (let i = 0; i < Math.min(10, jsonData.length); i++) {
         const row = jsonData[i];
         if (!row) continue;
         
         for (let j = 0; j < row.length; j++) {
-          const header = String(row[j] || '').toLowerCase();
-          // Match "STUDENT NAME" or "Student Name" or just "Name" column
-          if ((header.includes('student') && header.includes('name')) || header === 'name') {
+          const header = String(row[j] || '').trim();
+          
+          // Check for name column
+          if (nameColIndex < 0 && matchesNameColumn(header)) {
             nameColIndex = j;
             headerIndex = i;
           }
-          // Match "Writing Score", "Writing Score (/50)", "Writing %", "Writing" etc.
-          if (header.includes('writing') && (header.includes('score') || header.includes('/') || header.includes('%') || header.trim() === 'writing')) {
-            // Prefer "Writing Score" over "Writing %"
-            if (scoreColIndex < 0 || header.includes('score') || header.includes('/50')) {
-              scoreColIndex = j;
-            }
+          
+          // Check for writing score column
+          if (scoreColIndex < 0 && matchesWritingColumn(header)) {
+            scoreColIndex = j;
+            if (headerIndex < 0) headerIndex = i;
           }
         }
+        
+        // Stop if we found both columns
         if (nameColIndex >= 0 && scoreColIndex >= 0) break;
       }
       
-      if (headerIndex < 0 || nameColIndex < 0 || scoreColIndex < 0) {
-        alert('Could not find "Student Name" and "Writing Score" columns in Excel file.');
+      if (nameColIndex < 0) {
+        alert('Could not find a Name column. Expected headers like: "Student Name", "Name", "Candidate", "First Name"');
+        return;
+      }
+      
+      if (scoreColIndex < 0) {
+        alert('Could not find a Writing Score column. Expected headers like: "Writing Score", "Writing", "Writing /50", "W. Score"');
         return;
       }
       
@@ -166,8 +224,8 @@ function importExcel(file) {
         const name = row[nameColIndex] ? String(row[nameColIndex]).trim() : '';
         const scoreRaw = row[scoreColIndex];
         
-        // Skip rows with empty name
-        if (!name) continue;
+        // Skip invalid names
+        if (!isValidStudentName(name)) continue;
         
         // Extract numeric score
         let score = 0;
@@ -176,12 +234,6 @@ function importExcel(file) {
         } else if (typeof scoreRaw === 'string') {
           const scoreMatch = scoreRaw.match(/(\d+)/);
           if (scoreMatch) score = parseInt(scoreMatch[1], 10);
-        }
-        
-        // Skip obviously invalid rows
-        if (name.toLowerCase().includes('sat ') || name.toLowerCase().includes('sun ') || 
-            name.toLowerCase().includes('mon ') || name.toLowerCase().includes('tue ')) {
-          continue;
         }
         
         students.push({ name, score });
@@ -207,33 +259,40 @@ function importCSV(file) {
       return;
     }
     
-    // Find header row (look for "Student Name" column)
+    // Find header row using fuzzy matching (scan first 10 rows)
     let headerIndex = -1;
     let nameColIndex = -1;
     let scoreColIndex = -1;
     
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
+    for (let i = 0; i < Math.min(10, lines.length); i++) {
       const cells = parseCSVLine(lines[i]);
       for (let j = 0; j < cells.length; j++) {
-        const header = cells[j].toLowerCase();
-        // Match "STUDENT NAME" or "Student Name" or just "Name" column
-        if ((header.includes('student') && header.includes('name')) || header.trim() === 'name') {
+        const header = cells[j].trim();
+        
+        // Check for name column
+        if (nameColIndex < 0 && matchesNameColumn(header)) {
           nameColIndex = j;
           headerIndex = i;
         }
-        // Match "Writing Score", "Writing Score (/50)", "Writing %", "Writing" etc.
-        if (header.includes('writing') && (header.includes('score') || header.includes('/') || header.includes('%') || header.trim() === 'writing')) {
-          // Prefer "Writing Score" over "Writing %"
-          if (scoreColIndex < 0 || header.includes('score') || header.includes('/50')) {
-            scoreColIndex = j;
-          }
+        
+        // Check for writing score column
+        if (scoreColIndex < 0 && matchesWritingColumn(header)) {
+          scoreColIndex = j;
+          if (headerIndex < 0) headerIndex = i;
         }
       }
+      
+      // Stop if we found both columns
       if (nameColIndex >= 0 && scoreColIndex >= 0) break;
     }
     
-    if (headerIndex < 0 || nameColIndex < 0 || scoreColIndex < 0) {
-      alert('Could not find "Student Name" and "Writing Score" columns in CSV.');
+    if (nameColIndex < 0) {
+      alert('Could not find a Name column. Expected headers like: "Student Name", "Name", "Candidate", "First Name"');
+      return;
+    }
+    
+    if (scoreColIndex < 0) {
+      alert('Could not find a Writing Score column. Expected headers like: "Writing Score", "Writing", "Writing /50", "W. Score"');
       return;
     }
     
@@ -244,20 +303,14 @@ function importCSV(file) {
       const name = cells[nameColIndex] ? cells[nameColIndex].trim() : '';
       const scoreText = cells[scoreColIndex] ? cells[scoreColIndex].trim() : '';
       
-      // Skip rows with empty name
-      if (!name) continue;
+      // Skip invalid names
+      if (!isValidStudentName(name)) continue;
       
       // Extract numeric score (handle formats like "45/50" or "45" or empty/0)
       let score = 0;
       const scoreMatch = scoreText.match(/(\d+)/);
       if (scoreMatch) {
         score = parseInt(scoreMatch[1], 10);
-      }
-      
-      // Skip obviously invalid rows (e.g., date/time headers)
-      if (name.toLowerCase().includes('sat ') || name.toLowerCase().includes('sun ') || 
-          name.toLowerCase().includes('mon ') || name.toLowerCase().includes('tue ')) {
-        continue;
       }
       
       students.push({ name, score });
