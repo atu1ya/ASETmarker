@@ -120,13 +120,15 @@ const NAME_PATTERNS = [
 ];
 
 const WRITING_PATTERNS = [
+  /^standardi[sz]ed\s*writing\s*score$/i,  // Exact match for "Standardised Writing Score" or "Standardized Writing Score"
+  /standardi[sz]ed.*writing/i,              // Contains "Standardised" + "Writing"
+  /writing.*standardi[sz]ed/i,              // Contains "Writing" + "Standardised"
   /^writing\s*score$/i,
   /^writing$/i,
   /writing.*score/i,
   /writing.*\/\s*50/i,
   /writing.*total/i,
   /w\.\s*score/i,
-  /\/50/,
   /score.*writing/i
 ];
 
@@ -137,6 +139,11 @@ function matchesNameColumn(header) {
 
 function matchesWritingColumn(header) {
   const h = String(header || '').trim();
+  // First, check for exact "Standardised Writing Score" match
+  if (/^standardi[sz]ed\s*writing\s*score$/i.test(h)) {
+    return true;
+  }
+  // Then check other patterns
   return WRITING_PATTERNS.some(pattern => pattern.test(h));
 }
 
@@ -179,6 +186,7 @@ function importExcel(file) {
       let headerIndex = -1;
       let nameColIndex = -1;
       let scoreColIndex = -1;
+      let bestScoreMatch = -1; // Track priority of writing column match
       
       // Scan first 10 rows for headers
       for (let i = 0; i < Math.min(10, jsonData.length); i++) {
@@ -194,15 +202,27 @@ function importExcel(file) {
             headerIndex = i;
           }
           
-          // Check for writing score column
-          if (scoreColIndex < 0 && matchesWritingColumn(header)) {
-            scoreColIndex = j;
-            if (headerIndex < 0) headerIndex = i;
+          // Check for writing score column - prioritize "Standardised Writing Score"
+          if (matchesWritingColumn(header)) {
+            // Priority: 3 = Standardised Writing Score, 2 = contains standardised, 1 = other writing
+            let priority = 1;
+            if (/^standardi[sz]ed\s*writing\s*score$/i.test(header)) {
+              priority = 3;
+            } else if (/standardi[sz]ed/i.test(header)) {
+              priority = 2;
+            }
+            
+            // Only replace if we found a better match
+            if (priority > bestScoreMatch) {
+              scoreColIndex = j;
+              bestScoreMatch = priority;
+              if (headerIndex < 0) headerIndex = i;
+            }
           }
         }
         
-        // Stop if we found both columns
-        if (nameColIndex >= 0 && scoreColIndex >= 0) break;
+        // Stop if we found both columns with best possible match for writing
+        if (nameColIndex >= 0 && bestScoreMatch === 3) break;
       }
       
       if (nameColIndex < 0) {
@@ -211,7 +231,7 @@ function importExcel(file) {
       }
       
       if (scoreColIndex < 0) {
-        alert('Could not find a Writing Score column. Expected headers like: "Writing Score", "Writing", "Writing /50", "W. Score"');
+        alert('Could not find a Writing Score column. Expected "Standardised Writing Score" or similar headers like: "Standardized Writing Score", "Writing Score", "Writing"');
         return;
       }
       
@@ -263,6 +283,7 @@ function importCSV(file) {
     let headerIndex = -1;
     let nameColIndex = -1;
     let scoreColIndex = -1;
+    let bestScoreMatch = -1; // Track priority of writing column match
     
     for (let i = 0; i < Math.min(10, lines.length); i++) {
       const cells = parseCSVLine(lines[i]);
@@ -275,15 +296,27 @@ function importCSV(file) {
           headerIndex = i;
         }
         
-        // Check for writing score column
-        if (scoreColIndex < 0 && matchesWritingColumn(header)) {
-          scoreColIndex = j;
-          if (headerIndex < 0) headerIndex = i;
+        // Check for writing score column - prioritize "Standardised Writing Score"
+        if (matchesWritingColumn(header)) {
+          // Priority: 3 = Standardised Writing Score, 2 = contains standardised, 1 = other writing
+          let priority = 1;
+          if (/^standardi[sz]ed\s*writing\s*score$/i.test(header)) {
+            priority = 3;
+          } else if (/standardi[sz]ed/i.test(header)) {
+            priority = 2;
+          }
+          
+          // Only replace if we found a better match
+          if (priority > bestScoreMatch) {
+            scoreColIndex = j;
+            bestScoreMatch = priority;
+            if (headerIndex < 0) headerIndex = i;
+          }
         }
       }
       
-      // Stop if we found both columns
-      if (nameColIndex >= 0 && scoreColIndex >= 0) break;
+      // Stop if we found both columns with best possible match for writing
+      if (nameColIndex >= 0 && bestScoreMatch === 3) break;
     }
     
     if (nameColIndex < 0) {
@@ -292,7 +325,7 @@ function importCSV(file) {
     }
     
     if (scoreColIndex < 0) {
-      alert('Could not find a Writing Score column. Expected headers like: "Writing Score", "Writing", "Writing /50", "W. Score"');
+      alert('Could not find a Writing Score column. Expected "Standardised Writing Score" or similar headers like: "Standardized Writing Score", "Writing Score", "Writing"');
       return;
     }
     
