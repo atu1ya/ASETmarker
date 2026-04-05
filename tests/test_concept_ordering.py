@@ -7,14 +7,14 @@ from pathlib import Path
 from unittest.mock import patch
 import pytest
 
-from web.services.docx_report import (
+from desktop.services.docx_report import (
     DocxReportGenerator,
     FlowType,
     DEFAULT_READING_CONCEPTS,
     DEFAULT_QR_CONCEPTS,
     ConceptMastery,
 )
-from web.services.analysis import FullAnalysis, LearningAreaResult
+from desktop.services.analysis import FullAnalysis, LearningAreaResult
 
 
 class TestConceptOrdering:
@@ -204,8 +204,7 @@ class TestConceptOrdering:
         
         context = generator._build_context_from_analysis(
             analysis,
-            student_name="Test Student",
-            writing_score=15.0,
+            student_data={"name": "Test Student", "writing_score": 15.0},
             flow_type=FlowType.STANDARD,
         )
         

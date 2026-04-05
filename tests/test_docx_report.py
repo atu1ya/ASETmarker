@@ -9,7 +9,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from web.services.docx_report import (
+from desktop.services.docx_report import (
     DocxReportGenerator,
     FlowType,
     ConceptMastery,
@@ -18,7 +18,7 @@ from web.services.docx_report import (
     DEFAULT_QR_CONCEPTS,
     MASTERY_THRESHOLD,
 )
-from web.services.analysis import FullAnalysis, LearningAreaResult
+from desktop.services.analysis import FullAnalysis, LearningAreaResult
 
 
 class TestConceptMastery:
@@ -37,6 +37,7 @@ class TestConceptMastery:
             "name": "Inference",
             "done_well": "✓",
             "improve": "",
+            "questions": "",
         }
     
     def test_to_dict_needs_improvement(self):
@@ -140,13 +141,16 @@ class TestBuildConceptMasteryList:
         concepts = ["Concept A", "Concept B", "Concept C"]
         
         result = generator._build_concept_mastery_list(
-            concepts, None, FlowType.MOCK
+            concepts,
+            "Reading",
+            None,
+            FlowType.MOCK,
         )
         
         assert len(result) == 3
         for concept in result:
-            assert concept["done_well"] == ""
-            assert concept["improve"] == ""
+            assert concept.done_well == ""
+            assert concept.improve == ""
     
     def test_standard_flow_done_well(self, generator):
         """Test that standard flow marks high mastery as done well."""
@@ -162,13 +166,16 @@ class TestBuildConceptMasteryList:
         ]
         
         result = generator._build_concept_mastery_list(
-            concepts, area_results, FlowType.STANDARD
+            concepts,
+            "Reading",
+            area_results,
+            FlowType.STANDARD,
         )
         
         assert len(result) == 1
-        assert result[0]["name"] == "High Mastery Concept"
-        assert result[0]["done_well"] == "✓"
-        assert result[0]["improve"] == ""
+        assert result[0].name == "High Mastery Concept"
+        assert result[0].done_well == "✓"
+        assert result[0].improve == ""
     
     def test_standard_flow_needs_improvement(self, generator):
         """Test that standard flow marks low mastery as needs improvement."""
@@ -184,12 +191,15 @@ class TestBuildConceptMasteryList:
         ]
         
         result = generator._build_concept_mastery_list(
-            concepts, area_results, FlowType.STANDARD
+            concepts,
+            "Reading",
+            area_results,
+            FlowType.STANDARD,
         )
         
         assert len(result) == 1
-        assert result[0]["done_well"] == ""
-        assert result[0]["improve"] == "✓"
+        assert result[0].done_well == ""
+        assert result[0].improve == "✓"
     
     def test_threshold_boundary(self, generator):
         """Test mastery at exactly 51% threshold."""
@@ -205,12 +215,15 @@ class TestBuildConceptMasteryList:
         ]
         
         result = generator._build_concept_mastery_list(
-            concepts, area_results, FlowType.STANDARD
+            concepts,
+            "Reading",
+            area_results,
+            FlowType.STANDARD,
         )
         
         # At threshold should be "Done well"
-        assert result[0]["done_well"] == "✓"
-        assert result[0]["improve"] == ""
+        assert result[0].done_well == "✓"
+        assert result[0].improve == ""
     
     def test_below_threshold(self, generator):
         """Test mastery just below 51% threshold."""
@@ -226,11 +239,14 @@ class TestBuildConceptMasteryList:
         ]
         
         result = generator._build_concept_mastery_list(
-            concepts, area_results, FlowType.STANDARD
+            concepts,
+            "Reading",
+            area_results,
+            FlowType.STANDARD,
         )
         
-        assert result[0]["done_well"] == ""
-        assert result[0]["improve"] == "✓"
+        assert result[0].done_well == ""
+        assert result[0].improve == "✓"
     
     def test_batch_flow_same_as_standard(self, generator):
         """Test that batch flow behaves same as standard."""
@@ -246,10 +262,16 @@ class TestBuildConceptMasteryList:
         ]
         
         standard_result = generator._build_concept_mastery_list(
-            concepts, area_results, FlowType.STANDARD
+            concepts,
+            "Reading",
+            area_results,
+            FlowType.STANDARD,
         )
         batch_result = generator._build_concept_mastery_list(
-            concepts, area_results, FlowType.BATCH
+            concepts,
+            "Reading",
+            area_results,
+            FlowType.BATCH,
         )
         
         assert standard_result == batch_result
@@ -439,7 +461,7 @@ class TestGenerateReport:
         template_file.touch()
         
         with patch.object(DocxReportGenerator, '_validate_template'):
-            with patch('web.services.docx_report.DocxTemplate') as mock_docx:
+            with patch('desktop.services.docx_report.DocxTemplate') as mock_docx:
                 mock_doc = MagicMock()
                 mock_docx.return_value = mock_doc
                 

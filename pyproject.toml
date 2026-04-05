@@ -20,7 +20,7 @@ target-version = ['py37']
 [project]
 name = "asetmarker"
 version = "0.1.0"
-description = "Web application for automated ASET exam marking built on the OMRChecker engine."
+description = "Desktop application for automated ASET exam marking and DOCX report generation."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [

@@ -9,7 +9,7 @@ import numpy as np
 from io import BytesIO
 from PIL import Image
 from typing import Any, Union, List, Dict, Tuple
-from web.services.marker import SubjectResult, MarkingResult, QRARMarkingResult, QuestionResult
+from desktop.services.marker import SubjectResult, MarkingResult, QRARMarkingResult, QuestionResult
 
 
 # Red color in BGR for OpenCV
@@ -73,6 +73,93 @@ class AnnotatorService:
         
         return bubble_index
 
+    def _compute_section_bounds(self, template, image_shape: Tuple[int, int, int]) -> Dict[str, Tuple[int, int, int, int]]:
+        """Compute QR and AR crop rectangles from template bubble coordinates."""
+        h, w = image_shape[:2]
+        by_section: Dict[str, List[Tuple[int, int, int, int]]] = {"QR": [], "AR": []}
+
+        if template is None or not hasattr(template, "field_blocks"):
+            mid = h // 2
+            return {
+                "QR": (0, 0, w, mid),
+                "AR": (0, mid, w, h - mid),
+            }
+
+        for field_block in template.field_blocks:
+            block_w, block_h = field_block.bubble_dimensions
+            for field_block_bubbles in field_block.traverse_bubbles:
+                for bubble in field_block_bubbles:
+                    label = str(bubble.field_label).strip().upper()
+                    section = None
+                    if label.startswith("QR"):
+                        section = "QR"
+                    elif label.startswith("AR"):
+                        section = "AR"
+                    if section is None:
+                        continue
+                    x = int(bubble.x + field_block.shift)
+                    y = int(bubble.y)
+                    by_section[section].append((x, y, x + int(block_w), y + int(block_h)))
+
+        pad = 20
+        bounds: Dict[str, Tuple[int, int, int, int]] = {}
+        for section, rects in by_section.items():
+            if not rects:
+                continue
+            min_x = max(0, min(r[0] for r in rects) - pad)
+            min_y = max(0, min(r[1] for r in rects) - pad)
+            max_x = min(w, max(r[2] for r in rects) + pad)
+            max_y = min(h, max(r[3] for r in rects) + pad)
+            bounds[section] = (min_x, min_y, max_x - min_x, max_y - min_y)
+
+        if "QR" not in bounds or "AR" not in bounds:
+            mid = h // 2
+            bounds.setdefault("QR", (0, 0, w, mid))
+            bounds.setdefault("AR", (0, mid, w, h - mid))
+
+        return bounds
+
+    def format_qrar_sections(self, annotated_img: np.ndarray, template: Any) -> np.ndarray:
+        """Format a combined QR/AR page into explicit top (QR) and bottom (AR) sections."""
+        if len(annotated_img.shape) == 2:
+            annotated_img = cv2.cvtColor(annotated_img, cv2.COLOR_GRAY2BGR)
+
+        bounds = self._compute_section_bounds(template, annotated_img.shape)
+        qr_x, qr_y, qr_w, qr_h = bounds["QR"]
+        ar_x, ar_y, ar_w, ar_h = bounds["AR"]
+
+        qr_crop = annotated_img[qr_y : qr_y + qr_h, qr_x : qr_x + qr_w]
+        ar_crop = annotated_img[ar_y : ar_y + ar_h, ar_x : ar_x + ar_w]
+
+        target_w = max(qr_crop.shape[1], ar_crop.shape[1])
+
+        def _pad_to_width(img: np.ndarray, width: int) -> np.ndarray:
+            if img.shape[1] == width:
+                return img
+            delta = width - img.shape[1]
+            left = delta // 2
+            right = delta - left
+            return cv2.copyMakeBorder(
+                img,
+                0,
+                0,
+                left,
+                right,
+                borderType=cv2.BORDER_CONSTANT,
+                value=(255, 255, 255),
+            )
+
+        qr_pad = _pad_to_width(qr_crop, target_w)
+        ar_pad = _pad_to_width(ar_crop, target_w)
+
+        separator = np.full((24, target_w, 3), 245, dtype=np.uint8)
+        cv2.putText(separator, "QR (Top)", (10, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (60, 60, 60), 1, cv2.LINE_AA)
+
+        separator_2 = np.full((24, target_w, 3), 245, dtype=np.uint8)
+        cv2.putText(separator_2, "AR (Bottom)", (10, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (60, 60, 60), 1, cv2.LINE_AA)
+
+        return np.vstack([separator, qr_pad, separator_2, ar_pad])
+
     def annotate_sheet(self, result: Union[SubjectResult, MarkingResult]) -> np.ndarray:
         """
         Annotates the sheet with feedback:
@@ -101,10 +188,6 @@ class AnnotatorService:
         
         questions = self._get_questions(result)
         
-        print(f"[ANNOTATOR] Annotating subject, Questions: {len(questions)}")
-        print(f"[ANNOTATOR] Image shape: {img.shape}, Template: {template.path.name if template else 'None'}")
-        print(f"[ANNOTATOR] Bubble index has {len(bubble_index)} entries")
-        
         # 4. Draw Red Boxes for INCORRECT answers
         for question in questions:
             if question.is_correct:
@@ -116,8 +199,6 @@ class AnnotatorService:
             label = str(question.label).strip().upper()
             lookup_key = f"{label}_{correct_val}"
             
-            print(f"[ANNOTATOR] Processing incorrect: {question.label}, correct={question.correct_value}, key={lookup_key}")
-            
             if lookup_key in bubble_index:
                 bubble, block = bubble_index[lookup_key]
                 
@@ -126,12 +207,8 @@ class AnnotatorService:
                 y = int(bubble.y)
                 w, h = block.bubble_dimensions
                 
-                print(f"[ANNOTATOR] Drawing red rectangle at x={x}, y={y}, w={w}, h={h}, shift={block.shift}")
-                
                 # Draw Red Rectangle (BGR: 0, 0, 255)
                 cv2.rectangle(img, (x, y), (x + w, y + h), CLR_RED, 2)
-            else:
-                print(f"[ANNOTATOR] WARNING: Could not find bubble for {lookup_key}")
         
         # Add score overlay
         img = self._add_score_overlay(img, result)

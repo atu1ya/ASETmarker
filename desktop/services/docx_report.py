@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from docxtpl import DocxTemplate, InlineImage
 from docx.shared import Inches, Mm
 
-from web.services.analysis import FullAnalysis, LearningAreaResult
+from desktop.services.analysis import FullAnalysis, LearningAreaResult
 
 logger = logging.getLogger(__name__)
 
@@ -291,7 +291,7 @@ class DocxReportGenerator:
         
         # If no concept mapping provided, try to load from config based on year level
         if concept_mapping is None:
-            from web.services.concept_loader import get_reading_concepts, get_qr_concepts
+            from desktop.services.concept_loader import get_reading_concepts, get_qr_concepts
             reading_concepts = get_reading_concepts(self.year_level)
             qr_concepts = get_qr_concepts(self.year_level)
             # Convert to expected format
