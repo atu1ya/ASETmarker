@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 import threading
 from datetime import datetime
@@ -50,8 +51,13 @@ class ASETDesktopGUI:
         self.qr_answer_key_path_var = tk.StringVar()
         self.ar_answer_key_path_var = tk.StringVar()
         self.concept_map_path_var = tk.StringVar()
+        self.output_parent_path_var = tk.StringVar(value=str(self.output_root))
+        self.output_folder_name_var = tk.StringVar(value=f"desktop_run_{datetime.now():%Y%m%d_%H%M%S}")
         self.status_var = tk.StringVar(
-            value="Select merged scans folder, attendance CSV, separate Reading/QR/AR keys, and concept mapping JSON."
+            value=(
+                "Select scans, CSV, separate Reading/QR/AR keys, concept mapping, "
+                "and output location."
+            )
         )
 
         self.scroll_canvas = tk.Canvas(
@@ -147,6 +153,25 @@ class ASETDesktopGUI:
             button_text="Browse JSON",
             button_command=self.pick_concept_mapping,
         )
+        self._add_input_row(
+            form_frame,
+            row_base=18,
+            label_text="Output Parent Folder",
+            hint_text="Choose where the run folder should be created.",
+            variable=self.output_parent_path_var,
+            button_text="Browse Output",
+            button_command=self.pick_output_parent_folder,
+        )
+        self._add_text_input_row(
+            form_frame,
+            row_base=21,
+            label_text="Output Folder Name",
+            hint_text=(
+                "Name for this run folder (letters, numbers, spaces, underscore, hyphen). "
+                "Must be unique in the selected parent folder."
+            ),
+            variable=self.output_folder_name_var,
+        )
 
         action_frame = ttk.Frame(container, style="App.TFrame")
         action_frame.grid(row=2, column=0, sticky="ew", pady=(4, 4))
@@ -181,8 +206,13 @@ class ASETDesktopGUI:
         container.bind("<Configure>", self._on_scrollable_content_configure)
         self.scroll_canvas.bind("<Configure>", self._on_scroll_canvas_configure)
         self.scroll_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.scroll_canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.scroll_canvas.bind_all("<Button-5>", self._on_mousewheel)
         self._set_status(
-            "Select merged scans folder, attendance CSV, separate Reading/QR/AR keys, and concept mapping JSON.",
+            (
+                "Select scans, CSV, separate Reading/QR/AR keys, concept mapping, "
+                "and output location."
+            ),
             level="info",
         )
 
@@ -324,6 +354,37 @@ class ASETDesktopGUI:
             pady=(0, 8),
         )
 
+    def _add_text_input_row(
+        self,
+        parent: ttk.Frame,
+        row_base: int,
+        label_text: str,
+        hint_text: str,
+        variable: tk.StringVar,
+    ) -> None:
+        ttk.Label(parent, text=label_text, style="FieldLabel.TLabel").grid(
+            row=row_base,
+            column=0,
+            columnspan=2,
+            sticky="w",
+        )
+        entry = ttk.Entry(parent, textvariable=variable, style="Input.TEntry")
+        entry.grid(
+            row=row_base + 1,
+            column=0,
+            columnspan=2,
+            sticky="ew",
+            pady=(3, 4),
+            ipady=3,
+        )
+        ttk.Label(parent, text=hint_text, style="Hint.TLabel").grid(
+            row=row_base + 2,
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=(0, 8),
+        )
+
     def _set_status(self, message: str, level: str = "info") -> None:
         style_map = {
             "info": "InfoStatus.TLabel",
@@ -347,22 +408,54 @@ class ASETDesktopGUI:
     def _on_mousewheel(self, event: tk.Event) -> None:
         if event.widget is None:
             return
-        # Keep scrolling scoped to this root window.
+
         widget = event.widget
-        if widget is not self.root and str(widget).startswith(str(self.root)):
-            self.scroll_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        if widget is not self.root and not str(widget).startswith(str(self.root)):
+            return
+
+        # Linux often emits Button-4/5 instead of MouseWheel.
+        if getattr(event, "num", None) == 4:
+            self.scroll_canvas.yview_scroll(-1, "units")
+            return
+        if getattr(event, "num", None) == 5:
+            self.scroll_canvas.yview_scroll(1, "units")
+            return
+
+        delta = getattr(event, "delta", 0)
+        if delta == 0:
+            return
+
+        if sys.platform == "darwin":
+            steps = -1 if delta > 0 else 1
+        else:
+            steps = int(-delta / 120)
+            if steps == 0:
+                steps = -1 if delta > 0 else 1
+        self.scroll_canvas.yview_scroll(steps, "units")
 
     @staticmethod
     def _resolve_repo_root() -> Path:
-        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-            return Path(sys._MEIPASS)
+        if getattr(sys, "frozen", False):
+            mei_pass = getattr(sys, "_MEIPASS", None)
+            if mei_pass:
+                return Path(mei_pass)
         return Path(__file__).resolve().parent
 
     @staticmethod
     def _resolve_output_root() -> Path:
         if getattr(sys, "frozen", False):
-            return Path(sys.executable).resolve().parent / "outputs"
+            return Path.home() / "Documents" / "ASETmarker_outputs"
         return Path(__file__).resolve().parent / "outputs"
+
+    @staticmethod
+    def _validate_output_folder_name(name: str) -> str:
+        if not name:
+            return "Please enter an output folder name."
+        if name in {".", ".."}:
+            return "Output folder name cannot be '.' or '..'."
+        if re.search(r"[<>:\"/\\|?*]", name):
+            return "Output folder name contains invalid characters."
+        return ""
 
     def pick_scans_folder(self) -> None:
         selected = filedialog.askdirectory(title="Select Exam Folder")
@@ -416,6 +509,11 @@ class ASETDesktopGUI:
         if selected:
             self.concept_map_path_var.set(selected)
 
+    def pick_output_parent_folder(self) -> None:
+        selected = filedialog.askdirectory(title="Select Output Parent Folder")
+        if selected:
+            self.output_parent_path_var.set(selected)
+
     def start_marking(self) -> None:
         scans_path = Path(self.scans_path_var.get().strip()) if self.scans_path_var.get().strip() else None
         csv_path = Path(self.csv_path_var.get().strip()) if self.csv_path_var.get().strip() else None
@@ -439,6 +537,9 @@ class ASETDesktopGUI:
             if self.concept_map_path_var.get().strip()
             else None
         )
+        output_parent_raw = self.output_parent_path_var.get().strip()
+        output_parent_path = Path(output_parent_raw) if output_parent_raw else self.output_root
+        output_folder_name = self.output_folder_name_var.get().strip()
 
         if scans_path is None or not scans_path.exists():
             messagebox.showerror("Invalid Input", "Please select a valid scans directory.")
@@ -467,6 +568,28 @@ class ASETDesktopGUI:
             messagebox.showerror("Invalid Input", "Please select a valid concept mapping JSON file.")
             return
 
+        name_error = self._validate_output_folder_name(output_folder_name)
+        if name_error:
+            messagebox.showerror("Invalid Output Name", name_error)
+            return
+
+        try:
+            output_parent_path.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            messagebox.showerror(
+                "Invalid Output Folder",
+                f"Could not create/access output parent folder:\n{output_parent_path}\n\n{exc}",
+            )
+            return
+
+        run_output_dir = output_parent_path / output_folder_name
+        if run_output_dir.exists():
+            messagebox.showerror(
+                "Output Folder Exists",
+                f"The output folder already exists:\n{run_output_dir}\n\nChoose a different folder name.",
+            )
+            return
+
         self.start_btn.configure(state="disabled")
         self._set_status("Marking in progress. Please wait...", level="info")
 
@@ -479,6 +602,7 @@ class ASETDesktopGUI:
                 qr_answer_key_path,
                 ar_answer_key_path,
                 concept_map_path,
+                run_output_dir,
             ),
             daemon=True,
         )
@@ -492,6 +616,7 @@ class ASETDesktopGUI:
         qr_answer_key_path: Path,
         ar_answer_key_path: Path,
         concept_map_path: Path,
+        run_output_dir: Path,
     ) -> None:
         try:
             processor = DesktopBatchProcessor(
@@ -501,7 +626,6 @@ class ASETDesktopGUI:
                 ar_answer_key_path=ar_answer_key_path,
                 concept_mapping_path=concept_map_path,
             )
-            run_output_dir = self.output_root / f"desktop_run_{datetime.now():%Y%m%d_%H%M%S}"
             summary = processor.run(scans_path=scans_path, csv_path=csv_path, output_dir=run_output_dir)
             success_count = sum(1 for row in summary.results if row.status == "Success")
             total_count = len(summary.results)

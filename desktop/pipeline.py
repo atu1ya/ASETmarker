@@ -117,6 +117,12 @@ class DesktopBatchProcessor:
         return safe if safe else "student"
 
     @staticmethod
+    def _safe_student_file_stem(value: str) -> str:
+        safe = DesktopBatchProcessor._safe_student_folder(value)
+        safe = safe.replace(" ", "_")
+        return safe if safe else "student"
+
+    @staticmethod
     def _normalize_answer_token(token: str) -> Optional[str]:
         cleaned = re.sub(r"[^A-Za-z]", "", token or "").upper()
         if ANSWER_VALUE_PATTERN.match(cleaned):
@@ -718,6 +724,7 @@ class DesktopBatchProcessor:
             student_output_dir = output_dir / self._safe_student_folder(student.name)
             student_output_dir.mkdir(parents=True, exist_ok=True)
             source_doc = doc_map[student.name]
+            student_file_stem = self._safe_student_file_stem(student.name)
             self._append_debug_log(
                 debug_log_path,
                 f"Student '{student.name}' start. Source document: {source_doc}",
@@ -788,9 +795,15 @@ class DesktopBatchProcessor:
                     ar_total=len(self.answer_keys.ar),
                 )
 
-                self._write_image_as_pdf(reading_annotated, student_output_dir / "reading_marked.pdf")
-                self._write_image_as_pdf(qrar_formatted, student_output_dir / "qrar_marked.pdf")
-                (student_output_dir / "writing_sheet.pdf").write_bytes(writing_pdf)
+                self._write_image_as_pdf(
+                    reading_annotated,
+                    student_output_dir / f"{student_file_stem}_reading.pdf",
+                )
+                self._write_image_as_pdf(
+                    qrar_formatted,
+                    student_output_dir / f"{student_file_stem}_qrar.pdf",
+                )
+                (student_output_dir / f"{student_file_stem}_writing.pdf").write_bytes(writing_pdf)
 
                 analysis = self.analysis_service.generate_full_analysis(
                     reading_result,
@@ -814,7 +827,7 @@ class DesktopBatchProcessor:
                     flow_type="batch",
                     analysis=analysis,
                 )
-                (student_output_dir / "report.docx").write_bytes(report_bytes)
+                (student_output_dir / f"{student_file_stem}_report.docx").write_bytes(report_bytes)
 
                 graph_bytes = self.docx_generator.generate_chart_bytes(
                     student_data=student_payload,
