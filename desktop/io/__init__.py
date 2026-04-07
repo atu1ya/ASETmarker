@@ -1,1 +1,3 @@
-from .merged_document_splitter import extract_merged_document_pages
+from .merged_document_splitter import MergedDocumentSplitter, SplitDocumentPages
+
+__all__ = ["MergedDocumentSplitter", "SplitDocumentPages"]

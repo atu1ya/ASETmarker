@@ -1,5 +1,6 @@
 """
-Legacy OMR CLI entrypoint.
+
+run with uvicorn web.app:app --host 0.0.0.0 --port 8000 --reload
 
 """
 

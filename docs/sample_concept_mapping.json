@@ -21,7 +21,7 @@
         "Geometry": ["qr1", "qr2", "qr3", "qr4", "qr5", "qr33"],
         "Graph / Data Interpretation": ["qr8", "qr9", "qr10", "qr12", "qr13", "qr32"],
         "Multiplication / Division": ["qr14", "qr15", "qr16", "qr17", "qr29"],
-        "Area / Perimeter": ["qr3, qr5"],
+        "Area / Perimeter": ["qr3", "qr5"],
         "Ratios / Unit Conversions": ["qr19", "qr20"],
         "Probability": ["qr26"],
         "Patterns / Sequences": ["qr23", "qr24", "qr25"],

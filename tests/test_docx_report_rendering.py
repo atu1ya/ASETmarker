@@ -12,8 +12,8 @@ from zipfile import ZipFile
 import pytest
 from docx import Document
 
-from desktop.services.docx_report import DocxReportGenerator, FlowType
-from desktop.services.analysis import FullAnalysis, LearningAreaResult
+from web.services.docx_report import DocxReportGenerator, FlowType
+from web.services.analysis import FullAnalysis, LearningAreaResult
 
 
 class TestDocxtplRendering:
@@ -51,7 +51,8 @@ class TestDocxtplRendering:
         # Build context
         context = generator._build_context_from_analysis(
             analysis,
-            student_data={"name": "Test Student", "writing_score": 15.0},
+            student_name="Test Student",
+            writing_score=15.0,
             flow_type=FlowType.STANDARD,
         )
         
@@ -137,7 +138,8 @@ class TestDocxtplRendering:
         
         context = generator._build_context_from_analysis(
             analysis,
-            student_data={"name": "Test Student", "writing_score": 15.0},
+            student_name="Test Student",
+            writing_score=15.0,
             flow_type=FlowType.STANDARD,
         )
         
@@ -177,7 +179,8 @@ class TestDocxtplRendering:
         
         context = generator._build_context_from_analysis(
             analysis,
-            student_data={"name": "Test Student", "writing_score": 15.0},
+            student_name="Test Student",
+            writing_score=15.0,
             flow_type=FlowType.STANDARD,
         )
         
@@ -216,7 +219,8 @@ class TestDocxtplRendering:
         
         context = generator._build_context_from_analysis(
             analysis,
-            student_data={"name": "Test Student", "writing_score": 15.0},
+            student_name="Test Student",
+            writing_score=15.0,
             flow_type=FlowType.STANDARD,
         )
         

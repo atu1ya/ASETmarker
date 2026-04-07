@@ -119,48 +119,78 @@ class AnnotatorService:
 
         return bounds
 
-    def format_qrar_sections(self, annotated_img: np.ndarray, template: Any) -> np.ndarray:
-        """Format a combined QR/AR page into explicit top (QR) and bottom (AR) sections."""
+    def _draw_score_badge(
+        self,
+        img: np.ndarray,
+        text: str,
+        x_right: int,
+        y_top: int,
+        font_scale: float = 1.0,
+        thickness: int = 2,
+    ) -> None:
+        """Draw a right-aligned score badge with a white background and blue border."""
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text_size, _ = cv2.getTextSize(text, font, font_scale, thickness)
+        text_w, text_h = text_size
+
+        x = max(20, x_right - text_w)
+        y = max(text_h + 20, y_top + text_h)
+
+        rect_x1 = x - 10
+        rect_y1 = y - text_h - 10
+        rect_x2 = x + text_w + 10
+        rect_y2 = y + 10
+        cv2.rectangle(img, (rect_x1, rect_y1), (rect_x2, rect_y2), (255, 255, 255), -1)
+        cv2.rectangle(img, (rect_x1, rect_y1), (rect_x2, rect_y2), (52, 152, 219), 3)
+        cv2.putText(img, text, (x, y), font, font_scale, (44, 62, 80), thickness, cv2.LINE_AA)
+
+    def format_qrar_sections(
+        self,
+        annotated_img: np.ndarray,
+        template: Any,
+        qr_score: int = 0,
+        qr_total: int = 0,
+        ar_score: int = 0,
+        ar_total: int = 0,
+    ) -> np.ndarray:
+        """Keep the original QR/AR sheet and place section scores at fixed right-side anchors.
+
+        Required layout:
+        - QR score at top-right of the full page.
+        - AR score at top-right of the bottom half of the full page.
+        """
         if len(annotated_img.shape) == 2:
             annotated_img = cv2.cvtColor(annotated_img, cv2.COLOR_GRAY2BGR)
 
-        bounds = self._compute_section_bounds(template, annotated_img.shape)
-        qr_x, qr_y, qr_w, qr_h = bounds["QR"]
-        ar_x, ar_y, ar_w, ar_h = bounds["AR"]
+        h, w = annotated_img.shape[:2]
+        right_anchor = w - 20
+        qr_text = f"QR: {qr_score} / {qr_total}" if qr_total else f"QR: {qr_score}"
+        ar_text = f"AR: {ar_score} / {ar_total}" if ar_total else f"AR: {ar_score}"
 
-        qr_crop = annotated_img[qr_y : qr_y + qr_h, qr_x : qr_x + qr_w]
-        ar_crop = annotated_img[ar_y : ar_y + ar_h, ar_x : ar_x + ar_w]
+        self._draw_score_badge(
+            annotated_img,
+            text=qr_text,
+            x_right=right_anchor,
+            y_top=20,
+            font_scale=1.0,
+            thickness=2,
+        )
+        self._draw_score_badge(
+            annotated_img,
+            text=ar_text,
+            x_right=right_anchor,
+            y_top=(h // 2) + 20,
+            font_scale=1.0,
+            thickness=2,
+        )
 
-        target_w = max(qr_crop.shape[1], ar_crop.shape[1])
+        return annotated_img
 
-        def _pad_to_width(img: np.ndarray, width: int) -> np.ndarray:
-            if img.shape[1] == width:
-                return img
-            delta = width - img.shape[1]
-            left = delta // 2
-            right = delta - left
-            return cv2.copyMakeBorder(
-                img,
-                0,
-                0,
-                left,
-                right,
-                borderType=cv2.BORDER_CONSTANT,
-                value=(255, 255, 255),
-            )
-
-        qr_pad = _pad_to_width(qr_crop, target_w)
-        ar_pad = _pad_to_width(ar_crop, target_w)
-
-        separator = np.full((24, target_w, 3), 245, dtype=np.uint8)
-        cv2.putText(separator, "QR (Top)", (10, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (60, 60, 60), 1, cv2.LINE_AA)
-
-        separator_2 = np.full((24, target_w, 3), 245, dtype=np.uint8)
-        cv2.putText(separator_2, "AR (Bottom)", (10, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (60, 60, 60), 1, cv2.LINE_AA)
-
-        return np.vstack([separator, qr_pad, separator_2, ar_pad])
-
-    def annotate_sheet(self, result: Union[SubjectResult, MarkingResult]) -> np.ndarray:
+    def annotate_sheet(
+        self,
+        result: Union[SubjectResult, MarkingResult],
+        include_score_overlay: bool = True,
+    ) -> np.ndarray:
         """
         Annotates the sheet with feedback:
         - Correct answers: No annotation
@@ -210,8 +240,8 @@ class AnnotatorService:
                 # Draw Red Rectangle (BGR: 0, 0, 255)
                 cv2.rectangle(img, (x, y), (x + w, y + h), CLR_RED, 2)
         
-        # Add score overlay
-        img = self._add_score_overlay(img, result)
+        if include_score_overlay:
+            img = self._add_score_overlay(img, result)
         
         return img
 
