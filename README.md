@@ -86,7 +86,14 @@ chmod +x scripts/build_macos.sh
 ./scripts/build_macos.sh
 ```
 
-Build artifacts are produced in dist/.
+Build output is `dist/ASETMarker.app`.
+Client handover package is created in `release/ASETMarker-macOS-YYYYMMDD.zip`.
+
+Run on macOS:
+
+```bash
+open dist/ASETMarker.app
+```
 
 ### Run Built App On Windows
 
