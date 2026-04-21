@@ -75,8 +75,8 @@ python main_gui.py
 
 ### Windows (.exe)
 
-```powershell
-./scripts/build_windows.ps1
+```bat
+scripts\build_windows.bat
 ```
 
 ### macOS
@@ -86,7 +86,22 @@ chmod +x scripts/build_macos.sh
 ./scripts/build_macos.sh
 ```
 
-Build artifacts are produced in dist/.
+Build output is `dist/ASETMarker.app`.
+Client handover package is created in `release/ASETMarker-macOS-YYYYMMDD.zip`.
+
+Run on macOS:
+
+```bash
+open dist/ASETMarker.app
+```
+
+### Run Built App On Windows
+
+```bat
+scripts\run_windows.bat
+```
+
+For client handover, use `release/ASETMarker-Windows-YYYYMMDD.zip` and tell the client to run `Run_ASETMarker.bat` after extraction.
 
 ## CI
 

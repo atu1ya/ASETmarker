@@ -1,11 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_dynamic_libs
 from PyInstaller.utils.hooks import collect_submodules
 
+
+ROOT_DIR = Path(__file__).resolve().parent
+ICON_PATH = ROOT_DIR / 'assets' / 'ASETMarker.icns'
+
 datas = [('config', 'config'), ('docs', 'docs'), ('assets', 'assets')]
-hiddenimports = ['fitz']
+binaries = []
+hiddenimports = ['fitz', 'cv2']
 datas += collect_data_files('matplotlib')
 datas += collect_data_files('docxtpl')
+binaries += collect_dynamic_libs('cv2')
 hiddenimports += collect_submodules('desktop')
 hiddenimports += collect_submodules('src')
 
@@ -13,7 +22,7 @@ hiddenimports += collect_submodules('src')
 a = Analysis(
     ['main_gui.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -28,8 +37,8 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
+    [],
+    exclude_binaries=True,
     [],
     name='ASETMarker',
     debug=False,
@@ -44,4 +53,21 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='ASETMarker',
+)
+
+app = BUNDLE(
+    coll,
+    name='ASETMarker.app',
+    icon=str(ICON_PATH) if ICON_PATH.exists() else None,
+    bundle_identifier='com.aset.marker',
 )
