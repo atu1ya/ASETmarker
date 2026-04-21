@@ -33,26 +33,26 @@ class MergedDocumentSplitter:
 
         pages = self._extract_pages_as_grayscale(doc_path)
         page_count = len(pages)
-        if page_count < 2:
+        if page_count < 3:
             raise ValueError(
-                "Merged document must include at least 2 pages in this order: Reading, QR/AR, (optional) Writing."
+                "Merged document must include at least 3 pages in this order: Reading, ignored page, QR/AR, (optional) Writing."
             )
 
         reading_page = pages[0]
-        qrar_page = pages[1]
-        writing_page = pages[2] if page_count >= 3 else None
+        qrar_page = pages[2]
+        writing_page = pages[3] if page_count >= 4 else None
         warnings: List[str] = []
 
         writing_page_pdf: Optional[bytes]
-        if page_count >= 3:
+        if page_count >= 4:
             if suffix == ".pdf":
-                writing_page_pdf = self._extract_pdf_pages_from(pdf_path=doc_path, start_page=2)
+                writing_page_pdf = self._extract_pdf_pages_from(pdf_path=doc_path, start_page=3)
             else:
-                writing_page_pdf = self._images_to_pdf_bytes(pages[2:])
+                writing_page_pdf = self._images_to_pdf_bytes(pages[3:])
         else:
             writing_page_pdf = None
             warnings.append(
-                "Writing page not found (only 2 pages supplied). A placeholder writing sheet will be generated."
+                "Writing page not found (only 3 pages supplied). A placeholder writing sheet will be generated."
             )
 
         return SplitDocumentPages(
