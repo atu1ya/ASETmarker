@@ -48,6 +48,86 @@ def test_load_students_csv_uses_writing_percent_column(tmp_path: Path, processor
     assert students[0].writing_percent == 88.0
 
 
+def test_load_students_csv_accepts_case_insensitive_shuffled_headers(
+    tmp_path: Path,
+    processor: DesktopBatchProcessor,
+) -> None:
+    csv_path = tmp_path / "students_shuffled.csv"
+    headers = [
+        "writing %",
+        "ar score (/35)",
+        "student name",
+        "reading %",
+        "total score before standardising",
+        "qr %",
+        "standardised writing score",
+        "standardised ar score",
+        "standardised qr score",
+        "reading score (/35)",
+        "qr score (/35)",
+        "writing score (/50)",
+        "standardised reading score",
+        "total standard score (/400)",
+        "ar %",
+    ]
+    row = [
+        "88.0",
+        "20",
+        "Alice Smith",
+        "62.9",
+        "111",
+        "71.4",
+        "75",
+        "66",
+        "72",
+        "22",
+        "25",
+        "44",
+        "70",
+        "283",
+        "57.1",
+    ]
+    _write_csv(csv_path, headers, [row])
+
+    students = processor.load_students_csv(csv_path)
+
+    assert len(students) == 1
+    assert students[0].name == "Alice Smith"
+    assert students[0].writing_percent == 88.0
+
+
+def test_load_students_csv_marks_missing_writing_as_skip(
+    tmp_path: Path,
+    processor: DesktopBatchProcessor,
+) -> None:
+    csv_path = tmp_path / "students_missing_writing.csv"
+    row = [
+        "Alice Smith",
+        "22",
+        "62.9",
+        "70",
+        "25",
+        "71.4",
+        "72",
+        "20",
+        "57.1",
+        "66",
+        "44",
+        "",
+        "75",
+        "283",
+        "111",
+    ]
+    _write_csv(csv_path, EXPECTED_CSV_HEADERS, [row])
+
+    students = processor.load_students_csv(csv_path)
+
+    assert len(students) == 1
+    assert students[0].name == "Alice Smith"
+    assert students[0].writing_percent is None
+    assert students[0].skip_reason == "Missing Writing % for student: Alice Smith"
+
+
 def test_load_students_csv_requires_expected_headers(tmp_path: Path, processor: DesktopBatchProcessor) -> None:
     csv_path = tmp_path / "students_missing_headers.csv"
     bad_headers = EXPECTED_CSV_HEADERS[:-1]
@@ -164,6 +244,27 @@ def test_missing_writing_placeholder_pdf_is_generated(processor: DesktopBatchPro
         assert doc.page_count == 1
     finally:
         doc.close()
+
+
+def test_run_skips_students_with_missing_writing_or_pdf(tmp_path: Path) -> None:
+    processor = DesktopBatchProcessor.__new__(DesktopBatchProcessor)
+    processor.repo_root = tmp_path
+    processor._append_debug_log = lambda *args, **kwargs: None
+    processor._safe_student_folder = DesktopBatchProcessor._safe_student_folder
+    processor._safe_student_file_stem = DesktopBatchProcessor._safe_student_file_stem
+    processor._normalize_name = DesktopBatchProcessor._normalize_name
+    processor.load_students_csv = lambda csv_path: [
+        type("Student", (), {"name": "Alice Smith", "writing_percent": None, "skip_reason": "Missing Writing % for student: Alice Smith"})(),
+        type("Student", (), {"name": "Bob Jones", "writing_percent": 77.0, "skip_reason": None})(),
+    ]
+    processor._collect_merged_docs = lambda scans_path: [tmp_path / "bob.pdf"]
+    processor._match_student_to_doc = lambda student_name, docs: None if student_name == "Bob Jones" else docs[0]
+
+    summary = processor.run(scans_path=tmp_path, csv_path=tmp_path / "students.csv", output_dir=tmp_path / "out")
+
+    assert [row.status for row in summary.results] == ["Skipped", "Skipped"]
+    assert any("Missing Writing %" in issue for issue in summary.issues)
+    assert any("Could not uniquely match merged scan" in issue for issue in summary.issues)
 
 
 def test_load_concept_mapping_accepts_aliases(tmp_path: Path, processor: DesktopBatchProcessor) -> None:

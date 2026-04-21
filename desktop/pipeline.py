@@ -49,7 +49,8 @@ AR_LABEL_PATTERN = re.compile(r"^(?:AR|ABSTRACT(?:REASONING)?)\s*0*(\d+)$", flag
 @dataclass
 class StudentInput:
     name: str
-    writing_percent: float
+    writing_percent: Optional[float]
+    skip_reason: Optional[str] = None
 
 
 @dataclass
@@ -73,6 +74,7 @@ class StudentRunResult:
 class BatchRunSummary:
     output_dir: Path
     results: List[StudentRunResult]
+    issues: List[str]
 
 
 class DesktopBatchProcessor:
@@ -108,6 +110,10 @@ class DesktopBatchProcessor:
 
     @staticmethod
     def _normalize_name(value: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", value.lower())
+
+    @staticmethod
+    def _normalize_csv_header(value: str) -> str:
         return re.sub(r"[^a-z0-9]", "", value.lower())
 
     @staticmethod
@@ -554,28 +560,60 @@ class DesktopBatchProcessor:
             if not reader.fieldnames:
                 raise ValueError("Student CSV must include headers.")
 
-            headers = [header.strip() for header in reader.fieldnames if header is not None]
-            missing_headers = [header for header in EXPECTED_CSV_HEADERS if header not in headers]
+            header_lookup = {
+                self._normalize_csv_header(header.strip()): header
+                for header in reader.fieldnames
+                if header is not None and header.strip()
+            }
+
+            def resolve_header(required_header: str) -> str:
+                normalized_required = self._normalize_csv_header(required_header)
+                if normalized_required in header_lookup:
+                    return header_lookup[normalized_required]
+                raise KeyError(required_header)
+
+            missing_headers = []
+            for header in EXPECTED_CSV_HEADERS:
+                try:
+                    resolve_header(header)
+                except KeyError:
+                    missing_headers.append(header)
             if missing_headers:
                 raise ValueError(
-                    "Student CSV is missing expected headers: " + ", ".join(missing_headers)
+                    "Student CSV is missing expected headers (case-insensitive): "
+                    + ", ".join(missing_headers)
                 )
+
+            student_name_header = resolve_header("STUDENT NAME")
+            writing_percent_header = resolve_header("Writing %")
 
             students: List[StudentInput] = []
             for row in reader:
-                raw_name = str(row.get("STUDENT NAME", "")).strip()
+                raw_name = str(row.get(student_name_header, "")).strip()
                 if not raw_name:
                     continue
-                raw_writing = str(row.get("Writing %", "")).strip().replace("%", "")
+                raw_writing = str(row.get(writing_percent_header, "")).strip().replace("%", "")
                 if not raw_writing:
-                    raise ValueError(f"Missing Writing % for student: {raw_name}")
+                    students.append(
+                        StudentInput(
+                            name=raw_name,
+                            writing_percent=None,
+                            skip_reason=f"Missing Writing % for student: {raw_name}",
+                        )
+                    )
+                    continue
 
                 try:
                     writing_percent = float(raw_writing)
                 except ValueError as exc:
-                    raise ValueError(
-                        f"Invalid Writing % '{raw_writing}' for student: {raw_name}"
-                    ) from exc
+                    students.append(
+                        StudentInput(
+                            name=raw_name,
+                            writing_percent=None,
+                            skip_reason=f"Invalid Writing % '{raw_writing}' for student: {raw_name}",
+                        )
+                    )
+                    continue
 
                 students.append(StudentInput(name=raw_name, writing_percent=writing_percent))
 
@@ -597,28 +635,19 @@ class DesktopBatchProcessor:
             raise ValueError(f"No merged PDF files found in: {scans_path}")
         return sorted(files)
 
-    def _map_students_to_docs(self, students: List[StudentInput], docs: List[Path]) -> Dict[str, Path]:
-        if len(docs) == 1 and len(students) == 1:
-            return {students[0].name: docs[0]}
+    def _match_student_to_doc(self, student_name: str, docs: List[Path]) -> Optional[Path]:
+        if len(docs) == 1:
+            return docs[0]
 
         available = {doc: self._normalize_name(doc.stem) for doc in docs}
-        mapping: Dict[str, Path] = {}
+        target = self._normalize_name(student_name)
+        candidates = [doc for doc, stem in available.items() if stem == target]
+        if not candidates:
+            candidates = [doc for doc, stem in available.items() if target in stem or stem in target]
 
-        for student in students:
-            target = self._normalize_name(student.name)
-            candidates = [doc for doc, stem in available.items() if stem == target]
-            if not candidates:
-                candidates = [doc for doc, stem in available.items() if target in stem or stem in target]
-
-            if len(candidates) != 1:
-                raise ValueError(
-                    f"Could not uniquely match merged scan for student '{student.name}'. "
-                    f"Ensure file names align with student names in CSV."
-                )
-
-            mapping[student.name] = candidates[0]
-
-        return mapping
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
 
     @staticmethod
     def _encode_png_bytes(img: np.ndarray) -> bytes:
@@ -704,7 +733,6 @@ class DesktopBatchProcessor:
     def run(self, scans_path: Path, csv_path: Path, output_dir: Optional[Path] = None) -> BatchRunSummary:
         students = self.load_students_csv(csv_path)
         docs = self._collect_merged_docs(scans_path)
-        doc_map = self._map_students_to_docs(students, docs)
 
         if output_dir is None:
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -719,12 +747,31 @@ class DesktopBatchProcessor:
         self._append_debug_log(debug_log_path, f"Merged documents discovered: {len(docs)}")
 
         results: List[StudentRunResult] = []
+        issues: List[str] = []
 
         for student in students:
             student_output_dir = output_dir / self._safe_student_folder(student.name)
             student_output_dir.mkdir(parents=True, exist_ok=True)
-            source_doc = doc_map[student.name]
             student_file_stem = self._safe_student_file_stem(student.name)
+
+            if student.skip_reason:
+                issue = f"{student.name}: {student.skip_reason}"
+                issues.append(issue)
+                self._append_debug_log(debug_log_path, f"Student '{student.name}' skipped: {student.skip_reason}")
+                results.append(StudentRunResult(name=student.name, status="Skipped", notes=student.skip_reason))
+                continue
+
+            source_doc = self._match_student_to_doc(student.name, docs)
+            if source_doc is None:
+                issue = (
+                    f"{student.name}: Could not uniquely match merged scan for student. "
+                    f"Ensure file names align with student names in CSV."
+                )
+                issues.append(issue)
+                self._append_debug_log(debug_log_path, f"Student '{student.name}' skipped: {issue}")
+                results.append(StudentRunResult(name=student.name, status="Skipped", notes=issue))
+                continue
+
             self._append_debug_log(
                 debug_log_path,
                 f"Student '{student.name}' start. Source document: {source_doc}",
@@ -746,15 +793,16 @@ class DesktopBatchProcessor:
                     )
 
                 if writing_pdf is None:
-                    writing_pdf = self._create_missing_writing_pdf(
-                        student_name=student.name,
-                        source_doc=source_doc,
-                        page_count=split_pages.page_count,
+                    issue = (
+                        f"{student.name}: Missing writing page in merged PDF (only {split_pages.page_count} pages supplied)."
                     )
+                    issues.append(issue)
                     self._append_debug_log(
                         debug_log_path,
-                        f"Student '{student.name}' missing writing page: placeholder writing_sheet.pdf generated.",
+                        f"Student '{student.name}' skipped: {issue}",
                     )
+                    results.append(StudentRunResult(name=student.name, status="Skipped", notes=issue))
+                    continue
 
                 reading_bytes = self._encode_png_bytes(reading_page)
                 qrar_bytes = self._encode_png_bytes(qrar_page)
@@ -853,13 +901,15 @@ class DesktopBatchProcessor:
                     )
                 )
             except Exception as exc:
+                issue = f"{student.name}: {exc}"
+                issues.append(issue)
                 trace = traceback.format_exc()
                 (student_output_dir / "debug_error.txt").write_text(trace, encoding="utf-8")
                 self._append_debug_log(
                     debug_log_path,
                     f"Student '{student.name}' error: {exc}\n{trace}",
                 )
-                results.append(StudentRunResult(name=student.name, status="Error", notes=str(exc)))
+                results.append(StudentRunResult(name=student.name, status="Skipped", notes=str(exc)))
 
         summary_path = output_dir / "batch_summary.csv"
         with summary_path.open("w", encoding="utf-8", newline="") as handle:
@@ -877,4 +927,4 @@ class DesktopBatchProcessor:
             f"Run completed. Success={success_count}, Failed={failure_count}",
         )
 
-        return BatchRunSummary(output_dir=output_dir, results=results)
+        return BatchRunSummary(output_dir=output_dir, results=results, issues=issues)

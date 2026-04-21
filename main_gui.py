@@ -112,7 +112,7 @@ class ASETDesktopGUI:
             form_frame,
             row_base=3,
             label_text="Attendance & Scores CSV",
-            hint_text="Must include the required exam headers. Only 'Writing %' is used for report writing score.",
+                hint_text="Headers are matched case-insensitively, in any order. 'Writing %' is used for report writing score.",
             variable=self.csv_path_var,
             button_text="Browse CSV",
             button_command=self.pick_csv,
@@ -632,16 +632,16 @@ class ASETDesktopGUI:
             failed_rows = [row for row in summary.results if row.status != "Success"]
 
             if failed_rows:
-                preview_chunks: List[str] = []
-                for row in failed_rows[:2]:
+                issue_lines = []
+                for row in failed_rows:
                     note = row.notes.strip() if row.notes else "Unknown error"
-                    preview_chunks.append(f"{row.name}: {note}")
-                preview = " | ".join(preview_chunks)
+                    issue_lines.append(f"- {row.name}: {note}")
+                issues_text = "\n".join(issue_lines)
                 done_message = (
                     f"Completed: {success_count}/{total_count} students succeeded. "
-                    f"Failed: {len(failed_rows)}. "
+                    f"Skipped/failed: {len(failed_rows)}. "
                     f"Debug log: {summary.output_dir / 'debug_run.log'}\n"
-                    f"Errors: {preview}"
+                    f"Issues:\n{issues_text}"
                 )
             else:
                 done_message = (
@@ -650,7 +650,8 @@ class ASETDesktopGUI:
                 )
             self.root.after(0, lambda: self._on_success(done_message))
         except Exception as exc:
-            self.root.after(0, lambda: self._on_error(str(exc)))
+            error_message = str(exc)
+            self.root.after(0, lambda error_message=error_message: self._on_error(error_message))
 
     def _on_success(self, message: str) -> None:
         self.start_btn.configure(state="normal")
