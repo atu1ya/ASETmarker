@@ -82,7 +82,7 @@
       "direction": "horizontal",
       "bubbleValues": ["A", "B", "C", "D"],
       "fieldLabels": ["AR1", "AR2", "AR3", "AR4", "AR5", "AR6", "AR7", "AR8", "AR9", "AR10"],
-      "origin": [247, 1540],
+      "origin": [247, 1580],
       "bubblesGap": 67,
       "labelsGap": 50
     },
@@ -90,7 +90,7 @@
       "direction": "horizontal",
       "bubbleValues": ["A", "B", "C", "D"],
       "fieldLabels": ["AR11", "AR12", "AR13", "AR14", "AR15", "AR16", "AR17", "AR18", "AR19", "AR20"],
-      "origin": [579, 1540],
+      "origin": [579, 1580],
       "bubblesGap": 67,
       "labelsGap": 50
     },
@@ -98,7 +98,7 @@
       "direction": "horizontal",
       "bubbleValues": ["A", "B", "C", "D"],
       "fieldLabels": ["AR21", "AR22", "AR23", "AR24", "AR25", "AR26", "AR27", "AR28", "AR29", "AR30"],
-      "origin": [913, 1540],
+      "origin": [913, 1580],
       "bubblesGap": 67,
       "labelsGap": 50
     },
@@ -106,7 +106,7 @@
       "direction": "horizontal",
       "bubbleValues": ["A", "B", "C", "D"],
       "fieldLabels": ["AR31", "AR32", "AR33", "AR34", "AR35"],
-      "origin": [1246, 1540],
+      "origin": [1246, 1580],
       "bubblesGap": 67,
       "labelsGap": 50
     }
