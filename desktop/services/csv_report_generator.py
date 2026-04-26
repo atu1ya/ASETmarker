@@ -386,12 +386,25 @@ class CSVReportGenerator:
         self.docx_generator = DocxReportGenerator()
 
     @staticmethod
+    def _safe_name_token(student_name: str) -> str:
+        """Sanitize a student name for safe use as a filesystem path component.
+
+        Strips characters disallowed on Windows/POSIX (``<>:"/\\|?*`` and control
+        chars) and trailing dots/spaces (a Windows restriction). Falls back to
+        ``"Student"`` if the name reduces to nothing.
+        """
+        safe = re.sub(r"[<>:\"/\\|?*\x00-\x1f]", "_", student_name)
+        safe = re.sub(r"\s+", " ", safe).strip()
+        safe = safe.rstrip(". ")
+        return safe or "Student"
+
+    @staticmethod
     def _safe_output_filename(student_name: str) -> str:
-        safe = re.sub(r"[<>:\"/\\|?*]", "_", student_name).strip()
-        safe = re.sub(r"\s+", " ", safe)
-        if not safe:
-            safe = "Student"
-        return f"{safe}_ASET_Report.docx"
+        return f"{CSVReportGenerator._safe_name_token(student_name)}_ASET_Report.docx"
+
+    @staticmethod
+    def _safe_graph_filename(student_name: str) -> str:
+        return f"{CSVReportGenerator._safe_name_token(student_name)}_Scores_Graph.png"
 
     def _build_empty_concept_rows(self, concept_names: List[str], subject_name: str) -> List[Dict[str, str]]:
         concepts = self.docx_generator._build_concept_mastery_list(
@@ -469,7 +482,7 @@ class CSVReportGenerator:
             "total_score_before_standardising": round(student.total_score_before_standardising, 2),
         }
 
-    def _generate_report_bytes(self, context: Dict[str, Any]) -> bytes:
+    def _generate_report_bytes(self, context: Dict[str, Any]) -> tuple[bytes, bytes]:
         doc = DocxTemplate(self.docx_generator.template_path)
 
         scores = {
@@ -484,6 +497,8 @@ class CSVReportGenerator:
             str(context["student_name"]),
             scores,
         )
+        chart_bytes = chart_buffer.getvalue()
+        chart_buffer.seek(0)
         context["graph_image"] = InlineImage(doc, chart_buffer, width=Inches(5))
 
         doc.render(context)
@@ -494,7 +509,7 @@ class CSVReportGenerator:
         output = io.BytesIO()
         doc.save(output)
         output.seek(0)
-        return output.getvalue()
+        return output.getvalue(), chart_bytes
 
     def generate_reports(
         self,
@@ -529,14 +544,23 @@ class CSVReportGenerator:
 
             try:
                 context = self._build_template_context(student)
-                report_bytes = self._generate_report_bytes(context)
+                report_bytes, chart_bytes = self._generate_report_bytes(context)
 
-                output_path = output_dir / self._safe_output_filename(student.student_name)
-                output_path.write_bytes(report_bytes)
-                generated_files.append(output_path)
+                student_dir = output_dir / self._safe_name_token(student.student_name)
+                student_dir.mkdir(parents=True, exist_ok=True)
+
+                report_path = student_dir / self._safe_output_filename(student.student_name)
+                report_path.write_bytes(report_bytes)
+                generated_files.append(report_path)
+
+                graph_path = student_dir / self._safe_graph_filename(student.student_name)
+                graph_path.write_bytes(chart_bytes)
+                generated_files.append(graph_path)
 
                 if progress_callback:
-                    progress_callback(f"Saved {output_path.name}")
+                    progress_callback(
+                        f"Saved {report_path.name} and {graph_path.name} to {student_dir.name}/"
+                    )
             except PermissionError as exc:
                 message = (
                     f"{student.student_name}: Could not write report file because it is in use. "
