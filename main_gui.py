@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from desktop.pipeline import DesktopBatchProcessor
+from desktop.services.csv_report_generator import CSVReportBatchSummary, CSVReportGenerator
 
 
 class ASETDesktopGUI:
@@ -60,14 +61,25 @@ class ASETDesktopGUI:
             )
         )
 
+        self.report_csv_path_var = tk.StringVar()
+        self.report_output_dir_var = tk.StringVar(value=str(self.output_root))
+
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill="both", expand=True)
+
+        self.marker_tab = ttk.Frame(self.notebook, style="App.TFrame")
+        self.report_tab = ttk.Frame(self.notebook, style="App.TFrame")
+        self.notebook.add(self.marker_tab, text="Marker")
+        self.notebook.add(self.report_tab, text="Report Generator")
+
         self.scroll_canvas = tk.Canvas(
-            self.root,
+            self.marker_tab,
             background=self.COLORS["app_bg"],
             highlightthickness=0,
             bd=0,
         )
         self.scrollbar = ttk.Scrollbar(
-            self.root,
+            self.marker_tab,
             orient="vertical",
             command=self.scroll_canvas.yview,
         )
@@ -208,6 +220,9 @@ class ASETDesktopGUI:
         self.scroll_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
         self.scroll_canvas.bind_all("<Button-4>", self._on_mousewheel)
         self.scroll_canvas.bind_all("<Button-5>", self._on_mousewheel)
+
+        self._build_report_generator_tab()
+
         self._set_status(
             (
                 "Select scans, CSV, separate Reading/QR/AR keys, concept mapping, "
@@ -226,6 +241,19 @@ class ASETDesktopGUI:
         style.configure("App.TFrame", background=self.COLORS["app_bg"])
         style.configure("Header.TFrame", background=self.COLORS["header_bg"])
         style.configure("Card.TFrame", background=self.COLORS["panel_bg"])
+        style.configure("TNotebook", background=self.COLORS["app_bg"], borderwidth=0)
+        style.configure(
+            "TNotebook.Tab",
+            background=self.COLORS["button_secondary"],
+            foreground=self.COLORS["text_primary"],
+            padding=(16, 8),
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.map(
+            "TNotebook.Tab",
+            background=[("selected", self.COLORS["panel_bg"])],
+            foreground=[("selected", self.COLORS["text_primary"])],
+        )
 
         style.configure(
             "Title.TLabel",
@@ -352,6 +380,112 @@ class ASETDesktopGUI:
             columnspan=2,
             sticky="w",
             pady=(0, 8),
+        )
+
+    def _build_report_generator_tab(self) -> None:
+        self.report_tab.columnconfigure(0, weight=1)
+
+        container = ttk.Frame(self.report_tab, style="App.TFrame", padding=(22, 18, 22, 16))
+        container.grid(row=0, column=0, sticky="nsew")
+        container.columnconfigure(0, weight=1)
+
+        header_frame = ttk.Frame(container, style="Header.TFrame", padding=(18, 16, 18, 16))
+        header_frame.grid(row=0, column=0, sticky="ew")
+        header_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            header_frame,
+            text="Report Generator",
+            style="Title.TLabel",
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            header_frame,
+            text="Generate student DOCX reports directly from pre-calculated CSV scores.",
+            style="Subtitle.TLabel",
+        ).grid(row=1, column=0, sticky="w", pady=(6, 0))
+
+        form_frame = ttk.Frame(container, style="Card.TFrame", padding=(18, 16, 18, 12))
+        form_frame.grid(row=1, column=0, sticky="ew", pady=(14, 10))
+        form_frame.columnconfigure(0, weight=1)
+        form_frame.columnconfigure(1, weight=0)
+
+        self._add_input_row(
+            form_frame,
+            row_base=0,
+            label_text="Pre-calculated Scores CSV",
+            hint_text="CSV must match the required ASET export headers exactly.",
+            variable=self.report_csv_path_var,
+            button_text="Browse CSV",
+            button_command=self.pick_report_csv,
+        )
+        self._add_input_row(
+            form_frame,
+            row_base=3,
+            label_text="Report Output Folder",
+            hint_text="Each student report is saved as [STUDENT NAME]_ASET_Report.docx.",
+            variable=self.report_output_dir_var,
+            button_text="Browse Folder",
+            button_command=self.pick_report_output_folder,
+        )
+
+        action_frame = ttk.Frame(container, style="App.TFrame")
+        action_frame.grid(row=2, column=0, sticky="ew", pady=(4, 8))
+        action_frame.columnconfigure(0, weight=0)
+        action_frame.columnconfigure(1, weight=1)
+
+        self.generate_reports_btn = ttk.Button(
+            action_frame,
+            text="Generate Reports",
+            command=self.start_report_generation,
+            style="Primary.TButton",
+        )
+        self.generate_reports_btn.grid(row=0, column=0, sticky="w")
+
+        ttk.Label(
+            action_frame,
+            text="This workflow skips OMR and only creates DOCX reports.",
+            style="Muted.TLabel",
+        ).grid(row=0, column=1, sticky="w", padx=(14, 0))
+
+        status_frame = ttk.Frame(container, style="Card.TFrame", padding=(18, 12, 18, 12))
+        status_frame.grid(row=3, column=0, sticky="nsew")
+        status_frame.columnconfigure(0, weight=1)
+        status_frame.rowconfigure(1, weight=1)
+
+        ttk.Label(status_frame, text="Generation Progress", style="FieldLabel.TLabel").grid(
+            row=0,
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=(0, 8),
+        )
+
+        self.report_status_text = tk.Text(
+            status_frame,
+            height=12,
+            wrap="word",
+            font=("Segoe UI", 9),
+            background="#F8FAFC",
+            foreground=self.COLORS["text_primary"],
+            relief="flat",
+            borderwidth=0,
+            padx=10,
+            pady=8,
+            state="disabled",
+        )
+        self.report_status_text.grid(row=1, column=0, sticky="nsew")
+
+        report_scrollbar = ttk.Scrollbar(
+            status_frame,
+            orient="vertical",
+            command=self.report_status_text.yview,
+        )
+        report_scrollbar.grid(row=1, column=1, sticky="ns")
+        self.report_status_text.configure(yscrollcommand=report_scrollbar.set)
+
+        self._clear_report_status()
+        self._append_report_status(
+            "Select a CSV file and output folder, then click Generate Reports."
         )
 
     def _add_text_input_row(
@@ -513,6 +647,116 @@ class ASETDesktopGUI:
         selected = filedialog.askdirectory(title="Select Output Parent Folder")
         if selected:
             self.output_parent_path_var.set(selected)
+
+    def pick_report_csv(self) -> None:
+        selected = filedialog.askopenfilename(
+            title="Select Pre-calculated Scores CSV",
+            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
+        )
+        if selected:
+            self.report_csv_path_var.set(selected)
+
+    def pick_report_output_folder(self) -> None:
+        selected = filedialog.askdirectory(title="Select Report Output Folder")
+        if selected:
+            self.report_output_dir_var.set(selected)
+
+    def _clear_report_status(self) -> None:
+        self.report_status_text.configure(state="normal")
+        self.report_status_text.delete("1.0", tk.END)
+        self.report_status_text.configure(state="disabled")
+
+    def _append_report_status(self, message: str) -> None:
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.report_status_text.configure(state="normal")
+        self.report_status_text.insert(tk.END, f"[{timestamp}] {message}\n")
+        self.report_status_text.see(tk.END)
+        self.report_status_text.configure(state="disabled")
+
+    def _append_report_status_threadsafe(self, message: str) -> None:
+        self.root.after(0, lambda message=message: self._append_report_status(message))
+
+    def start_report_generation(self) -> None:
+        csv_path = (
+            Path(self.report_csv_path_var.get().strip())
+            if self.report_csv_path_var.get().strip()
+            else None
+        )
+        output_dir = (
+            Path(self.report_output_dir_var.get().strip())
+            if self.report_output_dir_var.get().strip()
+            else None
+        )
+
+        if csv_path is None or not csv_path.exists() or not csv_path.is_file():
+            messagebox.showerror("Invalid Input", "Please select a valid input CSV file.")
+            return
+
+        if output_dir is None:
+            messagebox.showerror("Invalid Input", "Please select a valid output folder.")
+            return
+
+        try:
+            output_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            messagebox.showerror(
+                "Invalid Output Folder",
+                f"Could not create/access output folder:\n{output_dir}\n\n{exc}",
+            )
+            return
+
+        self.generate_reports_btn.configure(state="disabled")
+        self._clear_report_status()
+        self._append_report_status("Report generation started.")
+
+        worker = threading.Thread(
+            target=self._run_report_generation,
+            args=(csv_path, output_dir),
+            daemon=True,
+        )
+        worker.start()
+
+    def _run_report_generation(self, csv_path: Path, output_dir: Path) -> None:
+        try:
+            generator = CSVReportGenerator(repo_root=self.repo_root)
+            summary = generator.generate_reports(
+                csv_path=csv_path,
+                output_dir=output_dir,
+                progress_callback=self._append_report_status_threadsafe,
+            )
+            self.root.after(0, lambda summary=summary: self._on_report_generation_success(summary))
+        except Exception as exc:
+            self.root.after(
+                0,
+                lambda error_message=str(exc): self._on_report_generation_error(error_message),
+            )
+
+    def _on_report_generation_success(self, summary: CSVReportBatchSummary) -> None:
+        self.generate_reports_btn.configure(state="normal")
+
+        if summary.failed_reports:
+            issue_lines = "\n".join(f"- {item}" for item in summary.failed_reports)
+            message = (
+                f"Generated {summary.generated_reports}/{summary.total_students} reports. "
+                f"Output folder: {summary.output_dir}\n\nIssues:\n{issue_lines}"
+            )
+            self._append_report_status(
+                f"Completed with issues: {summary.generated_reports}/{summary.total_students} reports generated."
+            )
+            messagebox.showwarning("Report Generation Completed with Issues", message)
+            return
+
+        message = (
+            f"Generated {summary.generated_reports}/{summary.total_students} reports successfully. "
+            f"Output folder: {summary.output_dir}"
+        )
+        self._append_report_status(message)
+        messagebox.showinfo("Report Generation Complete", message)
+
+    def _on_report_generation_error(self, error_message: str) -> None:
+        self.generate_reports_btn.configure(state="normal")
+        self._append_report_status(f"Error: {error_message}")
+        messagebox.showerror("Report Generation Failed", error_message)
 
     def start_marking(self) -> None:
         scans_path = Path(self.scans_path_var.get().strip()) if self.scans_path_var.get().strip() else None
