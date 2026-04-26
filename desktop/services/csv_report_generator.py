@@ -5,7 +5,7 @@ import io
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from docx.shared import Inches
 from docxtpl import DocxTemplate, InlineImage
@@ -193,6 +193,18 @@ def _canonical_header(value: str) -> str:
     return "".join(_header_tokens(value))
 
 
+def _cell_is_empty(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, list):
+        return all(_cell_is_empty(item) for item in value)
+    return str(value).strip() == ""
+
+
+def _row_is_empty(row: Mapping[Any, Any]) -> bool:
+    return all(_cell_is_empty(value) for value in row.values())
+
+
 def _validate_csv_headers(fieldnames: Optional[Sequence[str]]) -> Dict[str, str]:
     if not fieldnames:
         raise ValueError("CSV is missing header row.")
@@ -270,15 +282,27 @@ def _validate_csv_headers(fieldnames: Optional[Sequence[str]]) -> Dict[str, str]
     return resolved
 
 
-def parse_precalculated_csv(csv_path: Path) -> List[PrecalculatedStudentRow]:
+def parse_precalculated_csv(
+    csv_path: Path,
+    progress_callback: Optional[Callable[[str], None]] = None,
+) -> List[PrecalculatedStudentRow]:
     rows: List[PrecalculatedStudentRow] = []
+    skipped_blank_rows = 0
 
     try:
         with Path(csv_path).open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
+            if progress_callback:
+                progress_callback("Validating CSV headers...")
             header_map = _validate_csv_headers(reader.fieldnames)
+            if progress_callback:
+                progress_callback("Headers validated. Reading student rows...")
 
             for row_number, row in enumerate(reader, start=2):
+                if _row_is_empty(row):
+                    skipped_blank_rows += 1
+                    continue
+
                 student_name = str(row.get(header_map["STUDENT NAME"], "")).strip()
                 if not student_name:
                     raise ValueError(f"Row {row_number}: 'STUDENT NAME' is empty.")
@@ -347,6 +371,11 @@ def parse_precalculated_csv(csv_path: Path) -> List[PrecalculatedStudentRow]:
 
     if not rows:
         raise ValueError("CSV does not contain any student rows.")
+
+    if progress_callback and skipped_blank_rows:
+        progress_callback(
+            f"Skipped {skipped_blank_rows} blank row(s) at the end of the CSV."
+        )
 
     return rows
 
@@ -473,9 +502,17 @@ class CSVReportGenerator:
         output_dir: Path,
         progress_callback: Optional[Callable[[str], None]] = None,
     ) -> CSVReportBatchSummary:
-        students = parse_precalculated_csv(csv_path)
+        if progress_callback:
+            progress_callback("Opening CSV file...")
+
+        students = parse_precalculated_csv(
+            csv_path,
+            progress_callback=progress_callback,
+        )
 
         output_dir = Path(output_dir)
+        if progress_callback:
+            progress_callback("Preparing output directory...")
         output_dir.mkdir(parents=True, exist_ok=True)
 
         if progress_callback:
@@ -513,6 +550,14 @@ class CSVReportGenerator:
                 failed_reports.append(message)
                 if progress_callback:
                     progress_callback(f"Error: {message}")
+
+        if progress_callback:
+            progress_callback(
+                (
+                    "Report generation finished. "
+                    f"Success: {len(generated_files)}, Failed: {len(failed_reports)}"
+                )
+            )
 
         return CSVReportBatchSummary(
             output_dir=output_dir,

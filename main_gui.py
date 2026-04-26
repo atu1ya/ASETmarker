@@ -718,6 +718,7 @@ class ASETDesktopGUI:
 
     def _run_report_generation(self, csv_path: Path, output_dir: Path) -> None:
         try:
+            self._append_report_status_threadsafe("Initializing report generator...")
             generator = CSVReportGenerator(repo_root=self.repo_root)
             summary = generator.generate_reports(
                 csv_path=csv_path,
@@ -726,6 +727,9 @@ class ASETDesktopGUI:
             )
             self.root.after(0, lambda summary=summary: self._on_report_generation_success(summary))
         except Exception as exc:
+            self._append_report_status_threadsafe(
+                "Report generation failed. See error details below."
+            )
             self.root.after(
                 0,
                 lambda error_message=str(exc): self._on_report_generation_error(error_message),
@@ -756,6 +760,7 @@ class ASETDesktopGUI:
     def _on_report_generation_error(self, error_message: str) -> None:
         self.generate_reports_btn.configure(state="normal")
         self._append_report_status(f"Error: {error_message}")
+        self._append_report_status("Process stopped due to an error.")
         messagebox.showerror("Report Generation Failed", error_message)
 
     def start_marking(self) -> None:
